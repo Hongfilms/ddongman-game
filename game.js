@@ -33,7 +33,6 @@ const SPEED_INCREASE_AMOUNT = 0.25;
 const BGM_INITIAL_RATE = 1.0;
 const BGM_MAX_RATE = 1.5;
 const BGM_RATE_INCREASE_AMOUNT = 0.05;
-const BGM_FAST_THRESHOLD = 1.2; // BGM이 빨라지는 임계값
 const POOP_INTERVAL = 10;
 const KEYBOARD_LAYOUT = [
     ['A','B','C','D','E','F','G','H','I','J'],
@@ -121,11 +120,41 @@ class Game {
             const key = this.keyboard.selectedKey;
             if (key === 'END') this.submitScore();
             else if (key === '<') this.currentName.pop();
-            else if (this.currentName.length < 3) this.currentName.push(key);
+            else if (this.currentName.length < 3) {
+                this.currentName.push(key);
+            }
         });
 
         // 음소거 버튼 이벤트
         this.muteButton.addEventListener('click', () => this.toggleMute());
+
+        // 터치 이벤트 리스너
+        this.canvas.addEventListener('touchstart', (e) => {
+            if (this.gameState !== 'PLAYING') return;
+            e.preventDefault(); // 스크롤 방지
+            this.touch.startX = e.touches[0].clientX;
+            this.touch.startY = e.touches[0].clientY;
+            this.player.currentMoveDirection = null; // 새로운 터치 시작 시 방향 초기화
+        });
+
+        this.canvas.addEventListener('touchend', (e) => {
+            if (this.gameState !== 'PLAYING') return;
+            e.preventDefault(); // 스크롤 방지
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            const deltaX = touchEndX - this.touch.startX;
+            const deltaY = touchEndY - this.touch.startY;
+
+            if (Math.abs(deltaX) > Math.abs(deltaY)) { // 수평 스와이프
+                if (Math.abs(deltaX) > this.touch.threshold) {
+                    this.player.currentMoveDirection = (deltaX > 0) ? 'right' : 'left';
+                }
+            } else { // 수직 스와이프
+                if (Math.abs(deltaY) > this.touch.threshold) {
+                    this.player.currentMoveDirection = (deltaY > 0) ? 'down' : 'up';
+                }
+            }
+        });
     }
 
     toggleMute() {
@@ -177,7 +206,7 @@ class Game {
     }
 
     update() {
-        this.player.update(this.keys);
+        this.player.update(this.keys, this.player.currentMoveDirection);
         if (--this.poopCooldown <= 0) {
             const newPoop = this.player.dropPoop(this.poopMap);
             if (newPoop) { this.poops.push(newPoop); this.poopMap[newPoop.tileY][newPoop.tileX] = true; }
@@ -202,7 +231,7 @@ class Game {
                 this.gameState = 'ENTERING_NAME';
                 if (this.bgmNormal) this.bgmNormal.pause();
                 if (this.bgmFast) this.bgmFast.pause();
-                if (this.sfxGameOver) this.playSound(this.sfxGameOver);
+                this.playSound(this.sfxGameOver);
             }
         });
     }
@@ -300,7 +329,9 @@ class Game {
 }
 
 class Character {
-    constructor(x, y, speed, width=30, height=30) { this.x=x;this.y=y;this.speed=speed;this.width=width;this.height=height; }
+    constructor(x, y, speed, width=30, height=30) { 
+        this.x=x;this.y=y;this.speed=speed;this.width=width;this.height=height; 
+    }
     isWall(x, y) { 
         const mapX=Math.floor(x/TILE_SIZE),mapY=Math.floor(y/TILE_SIZE);
         if(MAP[mapY]===undefined||MAP[mapY][mapX]===undefined||MAP[mapY][mapX]===1){return true;}
@@ -309,10 +340,28 @@ class Character {
 }
 
 class Player extends Character {
-    constructor(x,y,speed){ super(x,y,speed); }
-    update(keys){        let nX=this.x,nY=this.y;
-        if(keys.ArrowUp)nY-=this.speed;if(keys.ArrowDown)nY+=this.speed;if(keys.ArrowLeft)nX-=this.speed;if(keys.ArrowRight)nX+=this.speed;
-        if(!this.isWall(nX,nY)&&!this.isWall(nX+this.width,nY)&&!this.isWall(nX,nY+this.height)&&!this.isWall(nX+this.width,nY+this.height)){this.x=nX;this.y=nY;}
+    constructor(x,y,speed){ super(x,y,speed); this.currentMoveDirection = null; }
+    update(keys, currentMoveDirection){
+        let nX=this.x,nY=this.y;
+        let moved = false;
+
+        if (currentMoveDirection) {
+            if (currentMoveDirection === 'up') nY -= this.speed;
+            else if (currentMoveDirection === 'down') nY += this.speed;
+            else if (currentMoveDirection === 'left') nX -= this.speed;
+            else if (currentMoveDirection === 'right') nX += this.speed;
+            moved = true;
+        } else { // Fallback to keyboard if no touch target
+            if(keys.ArrowUp)nY-=this.speed;if(keys.ArrowDown)nY+=this.speed;if(keys.ArrowLeft)nX-=this.speed;if(keys.ArrowRight)nX+=this.speed;
+            moved = true;
+        }
+
+        if (moved && !this.isWall(nX,nY)&&!this.isWall(nX+this.width,nY)&&!this.isWall(nX,nY+this.height)&&!this.isWall(nX+this.width,nY+this.height)){
+            this.x=nX;
+            this.y=nY;
+        } else if (moved) {
+            this.currentMoveDirection = null; // Stop movement if hit wall
+        }
     }
     draw(ctx){ctx.fillStyle='white';ctx.fillRect(this.x,this.y+this.height*.4,this.width,this.height*.6);ctx.fillStyle='#ddd';ctx.fillRect(this.x+this.width*.1,this.y,this.width*.8,this.height*.5);ctx.strokeStyle='#999';ctx.lineWidth=2;ctx.strokeRect(this.x,this.y+this.height*.4,this.width,this.height*.6);ctx.strokeRect(this.x+this.width*.1,this.y,this.width*.8,this.height*.5);}
     dropPoop(poopMap){
