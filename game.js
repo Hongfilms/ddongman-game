@@ -26,13 +26,14 @@ const MAP_COLS = MAP[0].length;
 const MAP_ROWS = MAP.length;
 
 const ENEMY_COUNT = 3;
-const ENEMY_INITIAL_SPEED = 1.5;
+const ENEMY_INITIAL_SPEED = 1.0;
 const ENEMY_MAX_SPEED = 4;
 const SPEED_INCREASE_INTERVAL = 10000;
-const SPEED_INCREASE_AMOUNT = 0.25;
+const SPEED_INCREASE_AMOUNT = 0.15;
 const BGM_INITIAL_RATE = 1.0;
 const BGM_MAX_RATE = 1.5;
 const BGM_RATE_INCREASE_AMOUNT = 0.05;
+const BGM_FAST_THRESHOLD = 1.2; // BGM이 빨라지는 임계값
 const POOP_INTERVAL = 10;
 const KEYBOARD_LAYOUT = [
     ['A','B','C','D','E','F','G','H','I','J'],
@@ -53,8 +54,10 @@ class Game {
         this.bgmFast = document.getElementById('bgm-fast');
         this.sfxGameOver = document.getElementById('sfx-gameover');
         this.muteButton = document.getElementById('muteButton');
+        this.startGameOverlay = document.getElementById('startGameOverlay');
         
         this.isMuted = false; // 음소거 상태
+        this.lastFrameTime = 0; // 프레임 속도 독립을 위한 시간 측정
 
         this.init();
         this.setupEventListeners();
@@ -72,25 +75,26 @@ class Game {
         this.startTime = Date.now();
         this.currentName = [];
         this.keyboard = { x: 40, y: 350, keySize: 40, selectedKey: null };
+        this.touch = { startX: 0, startY: 0, threshold: 20 }; // 터치 조작용
         this.createEnemies();
 
         if (this.difficultyTimer) clearInterval(this.difficultyTimer);
         this.difficultyTimer = setInterval(() => this.increaseDifficulty(), SPEED_INCREASE_INTERVAL);
         
-        // BGM 초기화 및 재생
+        // BGM 초기화 (재생은 overlay 클릭 후)
         if (this.bgmNormal) {
             this.bgmNormal.playbackRate = BGM_INITIAL_RATE;
             this.bgmNormal.currentTime = 0;
-            this.bgmNormal.play().catch(e => {});
+            this.bgmNormal.pause();
         }
         if (this.bgmFast) {
             this.bgmFast.playbackRate = BGM_INITIAL_RATE;
             this.bgmFast.currentTime = 0;
-            this.bgmFast.pause(); // 시작 시에는 fast BGM은 멈춰있음
+            this.bgmFast.pause();
         }
 
         if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
-        this.gameLoop();
+        // 게임 루프는 overlay 클릭 후 시작
     }
 
     setupEventListeners() {
@@ -155,6 +159,15 @@ class Game {
                 }
             }
         });
+
+        // 게임 시작 오버레이 클릭 이벤트
+        this.startGameOverlay.addEventListener('click', () => {
+            console.log("오버레이 클릭됨!"); // 디버깅용 로그
+            this.startGameOverlay.style.display = 'none';
+            if (this.bgmNormal) this.bgmNormal.play().catch(e => {});
+            this.lastFrameTime = performance.now(); // 첫 프레임 시간 기록
+            this.gameLoop(); // 게임 루프 시작
+        });
     }
 
     toggleMute() {
@@ -206,13 +219,17 @@ class Game {
     }
 
     update() {
-        this.player.update(this.keys, this.player.currentMoveDirection);
+        const currentTime = performance.now();
+        const deltaTime = (currentTime - this.lastFrameTime) / 1000; // 초 단위
+        this.lastFrameTime = currentTime;
+
+        this.player.update(this.keys, this.player.currentMoveDirection, deltaTime);
         if (--this.poopCooldown <= 0) {
             const newPoop = this.player.dropPoop(this.poopMap);
             if (newPoop) { this.poops.push(newPoop); this.poopMap[newPoop.tileY][newPoop.tileX] = true; }
             this.poopCooldown = POOP_INTERVAL;
         }
-        this.enemies.forEach(e => e.update(this.poops, this.player, this.enemies));
+        this.enemies.forEach(e => e.update(this.poops, this.player, this.enemies, deltaTime));
     }
 
     handleCollisions() {
@@ -329,10 +346,10 @@ class Game {
 }
 
 class Character {
-    constructor(x, y, speed, width=30, height=30) { 
-        this.x=x;this.y=y;this.speed=speed;this.width=width;this.height=height; 
+    constructor(x, y, speed, width=30, height=30) {
+        this.x = x; this.y = y; this.speed = speed; this.width = width; this.height = height;
     }
-    isWall(x, y) { 
+    isWall(x, y) {
         const mapX=Math.floor(x/TILE_SIZE),mapY=Math.floor(y/TILE_SIZE);
         if(MAP[mapY]===undefined||MAP[mapY][mapX]===undefined||MAP[mapY][mapX]===1){return true;}
         return false;
@@ -341,18 +358,19 @@ class Character {
 
 class Player extends Character {
     constructor(x,y,speed){ super(x,y,speed); this.currentMoveDirection = null; }
-    update(keys, currentMoveDirection){
+    update(keys, currentMoveDirection, deltaTime){
         let nX=this.x,nY=this.y;
         let moved = false;
 
         if (currentMoveDirection) {
-            if (currentMoveDirection === 'up') nY -= this.speed;
-            else if (currentMoveDirection === 'down') nY += this.speed;
-            else if (currentMoveDirection === 'left') nX -= this.speed;
-            else if (currentMoveDirection === 'right') nX += this.speed;
+            if (currentMoveDirection === 'up') nY -= this.speed * deltaTime * 60;
+            else if (currentMoveDirection === 'down') nY += this.speed * deltaTime * 60;
+            else if (currentMoveDirection === 'left') nX -= this.speed * deltaTime * 60;
+            else if (currentMoveDirection === 'right') nX += this.speed * deltaTime * 60;
             moved = true;
         } else { // Fallback to keyboard if no touch target
-            if(keys.ArrowUp)nY-=this.speed;if(keys.ArrowDown)nY+=this.speed;if(keys.ArrowLeft)nX-=this.speed;if(keys.ArrowRight)nX+=this.speed;
+            if(keys.ArrowUp)nY-=this.speed * deltaTime * 60;
+            if(keys.ArrowDown)nY+=this.speed * deltaTime * 60;if(keys.ArrowLeft)nX-=this.speed * deltaTime * 60;if(keys.ArrowRight)nX+=this.speed * deltaTime * 60;
             moved = true;
         }
 
@@ -377,7 +395,7 @@ class Player extends Character {
 
 class Enemy extends Character {
     constructor(x,y,speed){ super(x,y,speed);this.state='CHASING';this.stateTimer=0;this.targetPoop=null;this.path=[]; }
-    update(poops,player,allEnemies){
+    update(poops,player,allEnemies, deltaTime){
         if(this.state==='EATING'){if(--this.stateTimer<=0)this.state='CHASING';return;}
         if(this.state==='CHASING'){
             if(!this.path||this.path.length===0){
@@ -405,12 +423,12 @@ class Enemy extends Character {
                 const tY=tN.y*TILE_SIZE+(TILE_SIZE-this.height)/2;
                 const oX=this.x,oY=this.y;
                 const dx=tX-this.x,dy=tY-this.y;
-                if(Math.abs(dx)>0)this.x+=Math.sign(dx)*this.speed;
+                if(Math.abs(dx)>0)this.x+=Math.sign(dx)*this.speed * deltaTime * 60;
                 if(this.isWall(this.x,this.y)||this.isWall(this.x+this.width,this.y)||this.isWall(this.x,this.y+this.height)||this.isWall(this.x+this.width,this.y+this.height)){
                     this.x=oX;
                     this.path=[];
                 }
-                if(Math.abs(dy)>0)this.y+=Math.sign(dy)*this.speed;
+                if(Math.abs(dy)>0)this.y+=Math.sign(dy)*this.speed * deltaTime * 60;
                 if(this.isWall(this.x,this.y)||this.isWall(this.x+this.width,this.y)||this.isWall(this.x,this.y+this.height)||this.isWall(this.x+this.width,this.y+this.height)){
                     this.y=oY;
                     this.path=[];
@@ -426,7 +444,8 @@ class Enemy extends Character {
         }}}
         return null;
     }
-    onPoopEaten(){this.path=[];this.targetPoop=null;this.state='EATING';this.stateTimer=5;}
+    onPoopEaten(){this.path=[];this.targetPoop=null;this.state='EATING';this.stateTimer=5;
+    }
 }
 
 class Poop {
