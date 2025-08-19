@@ -159,19 +159,6 @@ class Game {
         this.difficultyTimer = setInterval(() => this.increaseDifficulty(), SPEED_INCREASE_INTERVAL);
         
         // BGM 초기화 (재생은 overlay 클릭 후)
-        this.initBGM();
-
-        if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
-        this.gameLoop(); // 게임 루프는 여기서 시작하지만, 실제 플레이는 overlay 클릭 후
-
-        // 시작 오버레이 표시
-        if (this.startGameOverlay) {
-            this.startGameOverlay.style.display = 'flex';
-        }
-    }
-
-    // BGM 초기화 메서드 추가
-    initBGM() {
         if (this.bgmNormal) {
             this.bgmNormal.playbackRate = BGM_INITIAL_RATE;
             this.bgmNormal.currentTime = 0;
@@ -181,6 +168,14 @@ class Game {
             this.bgmFast.playbackRate = BGM_INITIAL_RATE;
             this.bgmFast.currentTime = 0;
             this.bgmFast.pause(); // 시작 시에는 fast BGM은 멈춰있음
+        }
+
+        if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+        this.gameLoop(); // 게임 루프는 여기서 시작하지만, 실제 플레이는 overlay 클릭 후
+
+        // 시작 오버레이 표시
+        if (this.startGameOverlay) {
+            this.startGameOverlay.style.display = 'flex';
         }
     }
 
@@ -214,11 +209,15 @@ class Game {
                 this.init();
                 return;
             }
-            // if (this.gameState === 'PRE_GAME_OVERLAY') { // 시작 오버레이 클릭
-            //     this.startGameOverlay.style.display = 'none';
-            //     this.gameState = 'CONTROL_SELECTION'; // 조작 방식 선택 화면으로 이동
-            //     return;
-            // }
+            if (this.gameState === 'PRE_GAME_OVERLAY') { // 시작 오버레이 클릭
+                this.startGameOverlay.style.display = 'none';
+                // BGM 재생
+                if (this.bgmNormal) {
+                    this.bgmNormal.play().catch(e => console.log("BGM play error:", e));
+                }
+                this.gameState = 'CONTROL_SELECTION'; // 조작 방식 선택 화면으로 이동
+                return;
+            }
             if (this.gameState === 'CONTROL_SELECTION') { // 조작 방식 선택 화면 클릭
                 const rect = this.canvas.getBoundingClientRect();
                 const clickX = e.clientX - rect.left;
@@ -815,24 +814,19 @@ class Enemy extends Character {
     }
 }
 
-// Game 클래스 내부에 handleStartOverlayClick 메서드 추가
-    handleStartOverlayClick() {
-        if (this.gameState === 'PRE_GAME_OVERLAY') {
-            // 오버레이 숨기기
-            if (this.startGameOverlay) {
-                this.startGameOverlay.style.display = 'none';
-            }
-            // BGM 초기화 및 재생
-            this.initBGM();
-            if (this.bgmNormal) {
-                this.bgmNormal.play().catch(e => console.log("BGM play error:", e));
-            }
-            // 게임 상태 변경
-            this.gameState = 'CONTROL_SELECTION';
-            // 게임 루프 재시작 (필요한 경우)
-            // this.gameLoop(); // 일반적으로 gameLoop는 계속 실행 중이므로 별도 호출은 필요 없을 수 있음
+// Game 클래스에 handleStartOverlayClick 메서드 추가
+Game.prototype.handleStartOverlayClick = function() {
+    if (this.gameState === 'PRE_GAME_OVERLAY') {
+        // 오버레이 숨기기
+        if (this.startGameOverlay) {
+            this.startGameOverlay.style.display = 'none';
         }
+        // 게임 상태 변경
+        this.gameState = 'CONTROL_SELECTION';
+        // 게임 루프 재시작 (필요한 경우)
+        // this.gameLoop(); // 일반적으로 gameLoop는 계속 실행 중이므로 별도 호출은 필요 없을 수 있음
     }
+};
 
 class Poop {
     constructor(x,y,tileX,tileY){ this.x=x;this.y=y;this.width=10;this.height=10;this.tileX=tileX;this.tileY=tileY; }
