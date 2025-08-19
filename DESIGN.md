@@ -1,63 +1,88 @@
-# Ddong-man Game: Design Specification
+# Ddong-man (Poop-Man) Game: Design Specification
 
 ## 1. Overview
 
-This document outlines the component-based design of the Ddong-man Game. The game is a single-page web application built with vanilla JavaScript, operating on a central game loop architecture. The state of all game entities is managed within a single script (`game.js`) and rendered to an HTML Canvas.
+This document outlines the component-based design and implemented features of the Ddong-man Game. It is a single-page web application built with vanilla JavaScript, operating on an HTML Canvas. The game aims to be a 'reverse Pac-Man' where the player (a toilet) drops 'poop' and enemies (plungers) try to clean it up.
 
 ## 2. Core Architecture
 
-The game operates on a state-driven main loop (`gameLoop`) which is responsible for orchestrating updates, collision checks, and rendering for all game entities. The game's primary state is managed by the `gameState` variable, which can be `PLAYING`, `GAME_OVER`, or `LEADERBOARD`.
+The game operates on a state-driven main loop (`gameLoop`) orchestrated by the `Game` class. All game logic and rendering are handled within this loop, with `deltaTime` used to ensure frame-rate independent movement. The game's state machine manages transitions between different screens and gameplay phases.
 
-## 3. Component Breakdown
+## 3. Game States
 
-The game logic is functionally decomposed into several core components:
+-   **`PRE_GAME_OVERLAY`**: Initial state, displays a 'Click to Start' message to handle mobile audio autoplay policies.
+-   **`CONTROL_SELECTION`**: After the initial click, presents options for 'PC (Keyboard)' or 'Mobile (Touch D-pad)' controls.
+-   **`PLAYING`**: Active gameplay state. Player moves, poops are dropped, enemies chase, collisions are handled.
+-   **`ENTERING_NAME`**: Game Over state. Player enters a 3-character name using an on-screen virtual keyboard.
+-   **`LEADERBOARD`**: Displays the top 5 high scores saved in local storage.
 
-### 3.1. Game State Manager
-- **Purpose**: Controls the overall flow of the game, from initialization to gameplay, game over, and leaderboard display.
-- **Key Functions**: `init()`, `gameLoop()`
-- **Managed State**: `gameState`, `difficultyTimer`, `score`, `startTime`
+## 4. Component Breakdown
 
-### 3.2. Rendering Engine
-- **Purpose**: Responsible for drawing all visible elements onto the canvas.
-- **Key Functions**: `drawMap()`, `drawPlayer()`, `drawEnemies()`, `drawPoops()`, `drawUI()`, `drawGameOver()`, `drawLeaderboard()`
-- **Dependencies**: Reads from all entity states (`player`, `enemies`, `poops`, `score`) to render them.
+### 4.1. `Game` Class (Main Controller)
+-   **Purpose**: Manages the overall game flow, state transitions, main loop, input handling, and drawing orchestration.
+-   **Key Properties**: `canvas`, `ctx`, `player`, `poops`, `enemies`, `gameState`, `score`, `startTime`, `poopMap`, `keys`, `keyboard`, `dpad`, `bgmNormal`, `bgmFast`, `sfxGameOver`, `muteButton`, `isMuted`, `lastFrameTime`.
+-   **Key Methods**: `constructor()`, `init()`, `setupEventListeners()`, `gameLoop()`, `update()`, `handleCollisions()`, `draw()`, `drawMap()`, `drawUI()`, `drawDpad()`, `drawNameEntryScreen()`, `drawLeaderboard()`, `getScores()`, `saveScore()`, `playSound()`, `toggleMute()`, `submitScore()`, `getKeyFromMousePos()`, `createEnemies()`, `increaseDifficulty()`.
 
-### 3.3. Update Engine (`updateGame`)
-- **Purpose**: Updates the state and position of all dynamic game entities in each frame.
-- **Key Functions**: `updateGame()`
-- **Sub-components**:
-    - **Player Logic**: Handles player movement based on keyboard input (`keys`).
-    - **Poop Logic**: Manages the automatic creation of `poop` objects based on a cooldown.
-    - **Enemy AI Engine**: The most complex component, responsible for enemy behavior.
+### 4.2. `Character` Class (Base Class)
+-   **Purpose**: Provides common properties and methods for all moving entities (Player, Enemy).
+-   **Key Properties**: `x`, `y`, `speed`, `width`, `height`.
+-   **Key Methods**: `constructor()`, `isWall(x, y)` (checks if a given point is inside a wall tile).
 
-### 3.4. Enemy AI Engine
-- **Purpose**: Governs the decision-making and movement of enemy entities.
-- **Key Functions**: Logic within `updateGame()` for enemies, `findPath()`
-- **Managed State**: `enemy.state` (`CHASING`, `EATING`), `enemy.path`, `enemy.targetPoop`
-- **Behavioral Logic**:
-    1.  **Target Selection**: Selects a target based on a desirability score (distance vs. being targeted by other enemies). Player is the default target if no poops exist.
-    2.  **Pathfinding**: Uses Breadth-First Search (BFS) via `findPath()` to calculate the shortest path to the target.
-    3.  **Movement**: Follows the calculated path.
-    4.  **State Transitions**: Changes state to `EATING` upon collision with poop.
+### 4.3. `Player` Class
+-   **Purpose**: Represents the main player character (toilet).
+-   **Inherits From**: `Character`.
+-   **Key Properties**: `currentMoveDirection` (for touch input).
+-   **Key Methods**: 
+    -   `constructor()`
+    -   `update(keys, currentMoveDirection, deltaTime)`: Calculates player's next position based on keyboard or touch input, applying `deltaTime` for frame-rate independence. Handles wall collisions.
+    -   `draw(ctx)`: Renders the toilet character on the canvas.
+    -   `dropPoop(poopMap)`: Creates a new `Poop` object if the current tile is empty (checked via `poopMap`).
 
-### 3.5. Collision Engine
-- **Purpose**: Detects and resolves collisions between game entities.
-- **Key Functions**: `handleCollisions()`, `checkCollision()`
-- **Responsibilities**:
-    - Detects enemy-poop collisions, removes the poop, and updates the enemy's state.
-    - Detects player-enemy collisions and triggers the `GAME_OVER` state.
+### 4.4. `Enemy` Class
+-   **Purpose**: Represents enemy characters (plungers) that chase and clean up poop.
+-   **Inherits From**: `Character`.
+-   **Key Properties**: `state` (`CHASING`, `EATING`), `stateTimer`, `targetPoop`, `path`.
+-   **Key Methods**: 
+    -   `constructor()`
+    -   `update(poops, player, allEnemies, deltaTime)`: Implements enemy AI using a state machine.
+        -   **CHASING**: Finds the most desirable poop (considering distance and if other enemies are targeting it) or the player, then uses `findPath()` to get a path and follows it.
+        -   **EATING**: Pauses briefly after eating a poop to ensure all overlapping poops are cleared.
+    -   `draw(ctx)`: Renders the plunger character on the canvas.
+    -   `findPath(end)`: Uses Breadth-First Search (BFS) to find the shortest path to a target on the map grid.
+    -   `onPoopEaten()`: Called by `Game` when the enemy eats a poop, triggers state change to `EATING`.
 
-### 3.6. Leaderboard System
-- **Purpose**: Manages high score persistence.
-- **Key Functions**: `getScores()`, `saveScore()`
-- **Technology**: Uses browser `localStorage` to store the top 5 scores as a JSON string.
+### 4.5. `Poop` Class
+-   **Purpose**: Represents a single 'poop' object dropped by the player.
+-   **Key Properties**: `x`, `y`, `width`, `height`, `tileX`, `tileY`.
+-   **Key Methods**: `constructor()`, `draw(ctx)`.
 
-## 4. Design Improvement Suggestions
+## 5. Implemented Features
 
-The current design is a functional, single-file script. For future expansion and better maintainability, the following improvements could be considered:
+-   **Core Gameplay**: Player movement, automatic poop dropping, enemy movement and poop cleaning.
+-   **Graphics**: Canvas-based rendering of map, player (toilet), enemies (plungers), and poops.
+-   **Controls**: Keyboard input (PC) and touch-based D-pad (mobile) for player movement.
+-   **Game States**: `PRE_GAME_OVERLAY`, `CONTROL_SELECTION`, `PLAYING`, `ENTERING_NAME`, `LEADERBOARD`.
+-   **Difficulty Scaling**: Enemy speed and BGM playback rate increase over time.
+-   **Audio**: Dynamic BGM (normal/fast) and game over sound effect, with mute/unmute functionality.
+-   **UI**: Score display (survival time), on-screen virtual keyboard for name entry, and top 5 leaderboard.
+-   **Persistence**: High scores saved in browser's `localStorage`.
+-   **Bug Fixes**: Numerous fixes for character sticking, wall collisions, and game initialization/rendering issues.
 
-- **Object-Oriented Refactoring**: The code could be restructured using JavaScript Classes (e.g., `class Player`, `class Enemy`, `class Game`). This would encapsulate state and behavior more cleanly, making the code easier to manage. For example, all enemy update logic could be moved into an `update()` method within the `Enemy` class.
+## 6. Design Improvement Suggestions
 
-- **File Separation (Modularity)**: As the game grows, `game.js` could be split into multiple files based on components (e.g., `main.js`, `player.js`, `enemy.js`, `constants.js`). This would improve code organization and make it easier to find and modify specific parts of the logic.
+-   **File Separation**: For larger projects, splitting `game.js` into multiple files (e.g., `main.js`, `player.js`, `enemy.js`, `constants.js`, `utils.js`) would improve modularity and organization.
+-   **More Robust Error Handling**: While basic error handling is present, more comprehensive error logging and user feedback could be implemented.
+-   **Code Readability**: The code in `game.js` is currently quite condensed. Improving formatting and adding comments would make it easier to maintain.
+-   **Performance Optimization**: For smoother gameplay, especially on lower-end devices, consider optimizing the pathfinding algorithm or reducing unnecessary calculations in the game loop.
 
-- **Rendering Abstraction**: All `draw...` functions could be consolidated into a single `Renderer` class, which would be responsible for all canvas drawing operations. The game loop would simply pass the game state to the renderer in each frame.
+## 7. Future Enhancements (To-Do List)
+
+-   **Power-ups**: Introduce items that can temporarily slow down enemies or make the player invincible.
+-   **Multiple Levels**: Design different maps with increasing complexity.
+-   **Improved Graphics**: Replace simple rectangles with sprite-based graphics for characters and environment.
+-   **Sound Effects**: Add more sound effects for actions like dropping poop or enemy movements.
+-   **Mobile Responsiveness**: Further optimize the touch controls and UI for various mobile screen sizes.
+
+---
+
+*This document serves as a comprehensive overview of the Ddong-man Game's design and implemented features, intended to facilitate further development or re-implementation.*

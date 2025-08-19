@@ -59,23 +59,54 @@ class Game {
         this.isMuted = false; // 음소거 상태
         this.lastFrameTime = 0; // 프레임 속도 독립을 위한 시간 측정
 
-        this.init();
-        this.setupEventListeners();
+        // 이미지 로드
+        this.loadImages().then(() => {
+            this.init();
+            this.setupEventListeners();
+        });
+    }
+
+    // 이미지 로드 메서드 추가
+    loadImages() {
+        const imageFiles = {
+            east: 'poop_East_Idle.png',
+            north: 'poop_North_Idle.png',
+            south: 'poop_South_Idle.png',
+            west: 'poop_West_Idle.png'
+        };
+
+        const promises = Object.keys(imageFiles).map(key => {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    this.playerImages = this.playerImages || {};
+                    this.playerImages[key] = img;
+                    resolve();
+                };
+                img.onerror = reject;
+                img.src = imageFiles[key];
+            });
+        });
+
+        return Promise.all(promises);
     }
 
     init() {
         this.keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
-        this.player = new Player(TILE_SIZE + 5, TILE_SIZE + 5, 4);
+        this.player = new Player(TILE_SIZE + 5, TILE_SIZE + 5, 4, this.playerImages);
         this.poops = [];
         this.poopMap = Array(MAP_ROWS).fill(0).map(() => Array(MAP_COLS).fill(false));
         this.enemies = [];
-        this.gameState = 'PLAYING';
+        this.gameState = 'PRE_GAME_OVERLAY'; // 초기 상태 변경
         this.poopCooldown = POOP_INTERVAL;
         this.score = 0;
         this.startTime = Date.now();
         this.currentName = [];
         this.keyboard = { x: 40, y: 350, keySize: 40, selectedKey: null };
-        this.touch = { startX: 0, startY: 0, threshold: 20 }; // 터치 조작용
+        this.dpad = { x: 20, y: this.canvas.height - 120, size: 100, buttonSize: 40, activeDirection: null }; // D-pad 조작용
+        // 터치 이벤트를 위한 touch 객체 초기화
+        this.touch = { startX: 0, startY: 0, threshold: 10 }; // threshold는 스와이프 인식 최소 거리
+        this.controlMode = null; // 'PC' 또는 'MOBILE'
         this.createEnemies();
 
         if (this.difficultyTimer) clearInterval(this.difficultyTimer);
@@ -90,14 +121,25 @@ class Game {
         if (this.bgmFast) {
             this.bgmFast.playbackRate = BGM_INITIAL_RATE;
             this.bgmFast.currentTime = 0;
-            this.bgmFast.pause();
+            this.bgmFast.pause(); // 시작 시에는 fast BGM은 멈춰있음
         }
 
         if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
-        // 게임 루프는 overlay 클릭 후 시작
+        this.gameLoop(); // 게임 루프는 여기서 시작하지만, 실제 플레이는 overlay 클릭 후
+
+        // 시작 오버레이 표시
+        if (this.startGameOverlay) {
+            this.startGameOverlay.style.display = 'flex';
+        }
     }
 
     setupEventListeners() {
+        // startGameOverlay 클릭 이벤트 리스너 추가
+        if (this.startGameOverlay) {
+            this.startGameOverlay.addEventListener('click', () => {
+                this.handleStartOverlayClick();
+            });
+        }
         document.addEventListener('keydown', (e) => {
             if (this.gameState === 'LEADERBOARD' && e.key.toLowerCase() === 'r') {
                 this.init();
@@ -105,11 +147,12 @@ class Game {
                 if (e.key === 'Enter') this.submitScore();
                 else if (e.key === 'Backspace') this.currentName.pop();
                 else if (/^[a-zA-Z0-9]$/.test(e.key) && this.currentName.length < 3) this.currentName.push(e.key.toUpperCase());
-            } else if (this.gameState === 'PLAYING' && e.key in this.keys) {
+            } else if (this.gameState === 'PLAYING' && this.controlMode === 'PC' && e.key in this.keys) { // PC 모드일 때만 키보드 입력 처리
                 this.keys[e.key] = true;
             }
         });
-        document.addEventListener('keyup', (e) => { if (e.key in this.keys) this.keys[e.key] = false; });
+        document.addEventListener('keyup', (e) => { if (this.gameState === 'PLAYING' && this.controlMode === 'PC' && e.key in this.keys) this.keys[e.key] = false; });
+        
         this.canvas.addEventListener('mousemove', (e) => {
             if (this.gameState !== 'ENTERING_NAME') return;
             const rect = this.canvas.getBoundingClientRect();
@@ -120,6 +163,42 @@ class Game {
                 this.init();
                 return;
             }
+            // if (this.gameState === 'PRE_GAME_OVERLAY') { // 시작 오버레이 클릭
+            //     this.startGameOverlay.style.display = 'none';
+            //     this.gameState = 'CONTROL_SELECTION'; // 조작 방식 선택 화면으로 이동
+            //     return;
+            // }
+            if (this.gameState === 'CONTROL_SELECTION') { // 조작 방식 선택 화면 클릭
+                const rect = this.canvas.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+
+                // PC 버튼 영역
+                const pcBtnX = this.canvas.width / 2 - 100;
+                const pcBtnY = this.canvas.height / 2 - 30;
+                const btnWidth = 200;
+                const btnHeight = 50;
+
+                if (clickX > pcBtnX && clickX < pcBtnX + btnWidth && clickY > pcBtnY && clickY < pcBtnY + btnHeight) {
+                    this.controlMode = 'PC';
+                    this.gameState = 'PLAYING';
+                    this.lastFrameTime = performance.now(); // 게임 시작 시간 기록
+                    this.gameLoop();
+                    return;
+                }
+
+                // Mobile 버튼 영역
+                const mobileBtnX = this.canvas.width / 2 - 100;
+                const mobileBtnY = this.canvas.height / 2 + 30;
+                if (clickX > mobileBtnX && clickX < mobileBtnX + btnWidth && clickY > mobileBtnY && clickY < mobileBtnY + btnHeight) {
+                    this.controlMode = 'MOBILE';
+                    this.gameState = 'PLAYING';
+                    this.lastFrameTime = performance.now(); // 게임 시작 시간 기록
+                    this.gameLoop();
+                    return;
+                }
+            }
+
             if (this.gameState !== 'ENTERING_NAME' || !this.keyboard.selectedKey) return;
             const key = this.keyboard.selectedKey;
             if (key === 'END') this.submitScore();
@@ -159,19 +238,11 @@ class Game {
                 }
             }
         });
-
-        // 게임 시작 오버레이 클릭 이벤트
-        this.startGameOverlay.addEventListener('click', () => {
-            console.log("오버레이 클릭됨!"); // 디버깅용 로그
-            this.startGameOverlay.style.display = 'none';
-            if (this.bgmNormal) this.bgmNormal.play().catch(e => {});
-            this.lastFrameTime = performance.now(); // 첫 프레임 시간 기록
-            this.gameLoop(); // 게임 루프 시작
-        });
     }
 
     toggleMute() {
         this.isMuted = !this.isMuted;
+        // 오디오 요소 음소거 설정 주석 처리 해제
         if (this.bgmNormal) this.bgmNormal.muted = this.isMuted;
         if (this.bgmFast) this.bgmFast.muted = this.isMuted;
         if (this.sfxGameOver) this.sfxGameOver.muted = this.isMuted;
@@ -248,7 +319,7 @@ class Game {
                 this.gameState = 'ENTERING_NAME';
                 if (this.bgmNormal) this.bgmNormal.pause();
                 if (this.bgmFast) this.bgmFast.pause();
-                this.playSound(this.sfxGameOver);
+                this.playSound(this.sfxGameOver); // 게임 오버 사운드 재생 주석 처리 해제
             }
         });
     }
@@ -260,6 +331,7 @@ class Game {
         this.player.draw(this.ctx);
         this.enemies.forEach(e => e.draw(this.ctx));
         this.drawUI();
+        this.drawDpad(); // D-pad 그리기
     }
 
     gameLoop() {
@@ -268,9 +340,16 @@ class Game {
             this.update();
             this.handleCollisions();
             this.draw();
-        } else if (this.gameState === 'ENTERING_NAME') {
+        } else if (this.gameState === 'PRE_GAME_OVERLAY') {
+            // 오버레이가 표시되는 동안은 게임 로직 업데이트/그리기 안함
+            // 오버레이 자체는 HTML로 표시되므로 캔버스에 그릴 필요 없음
+        } else if (this.gameState === 'CONTROL_SELECTION') {
+            this.drawControlSelectionScreen();
+        }
+        else if (this.gameState === 'ENTERING_NAME') {
             this.drawNameEntryScreen();
-        } else if (this.gameState === 'LEADERBOARD') {
+        }
+        else if (this.gameState === 'LEADERBOARD') {
             this.drawLeaderboard();
         }
         this.animationFrameId = requestAnimationFrame(() => this.gameLoop());
@@ -340,6 +419,89 @@ class Game {
         this.ctx.fillText('Click to Restart',this.canvas.width/2,this.canvas.height-50);
     }
 
+    // drawControlSelectionScreen 메서드 추가
+    drawControlSelectionScreen() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.drawMap();
+        this.player.draw(this.ctx);
+        this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.fillStyle = 'white';
+        this.ctx.textAlign = 'center';
+        this.ctx.font = '30px sans-serif';
+        this.ctx.fillText('Select Control Mode', this.canvas.width / 2, 100);
+
+        // PC 버튼
+        const pcBtnX = this.canvas.width / 2 - 100;
+        const pcBtnY = this.canvas.height / 2 - 30;
+        const btnWidth = 200;
+        const btnHeight = 50;
+        this.ctx.fillStyle = '#444';
+        this.ctx.fillRect(pcBtnX, pcBtnY, btnWidth, btnHeight);
+        this.ctx.strokeStyle = 'white';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(pcBtnX, pcBtnY, btnWidth, btnHeight);
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = '20px sans-serif';
+        this.ctx.fillText('PC (Keyboard)', this.canvas.width / 2, this.canvas.height / 2);
+
+        // Mobile 버튼
+        const mobileBtnX = this.canvas.width / 2 - 100;
+        const mobileBtnY = this.canvas.height / 2 + 30;
+        this.ctx.fillStyle = '#444';
+        this.ctx.fillRect(mobileBtnX, mobileBtnY, btnWidth, btnHeight);
+        this.ctx.strokeStyle = 'white';
+        this.ctx.strokeRect(mobileBtnX, mobileBtnY, btnWidth, btnHeight);
+        this.ctx.fillStyle = 'white';
+        this.ctx.fillText('Mobile (Touch)', this.canvas.width / 2, this.canvas.height / 2 + 60);
+    }
+
+    // drawDpad 메서드 추가
+    drawDpad() {
+        // 모바일 조작 모드가 아닐 때는 그리지 않음
+        if (this.controlMode !== 'MOBILE') return;
+        
+        const dpad = this.dpad;
+        const centerX = dpad.x + dpad.size / 2;
+        const centerY = dpad.y + dpad.size / 2;
+        
+        // D-pad 배경
+        this.ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
+        this.ctx.beginPath();
+        this.ctx.arc(centerX, centerY, dpad.size / 2, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // D-pad 버튼들
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        // 위
+        this.ctx.fillRect(centerX - dpad.buttonSize / 2, centerY - dpad.buttonSize / 2 - dpad.buttonSize / 3, dpad.buttonSize, dpad.buttonSize);
+        // 아래
+        this.ctx.fillRect(centerX - dpad.buttonSize / 2, centerY + dpad.buttonSize / 2 + dpad.buttonSize / 3 - dpad.buttonSize, dpad.buttonSize, dpad.buttonSize);
+        // 왼쪽
+        this.ctx.fillRect(centerX - dpad.buttonSize / 2 - dpad.buttonSize / 3, centerY - dpad.buttonSize / 2, dpad.buttonSize, dpad.buttonSize);
+        // 오른쪽
+        this.ctx.fillRect(centerX + dpad.buttonSize / 2 + dpad.buttonSize / 3 - dpad.buttonSize, centerY - dpad.buttonSize / 2, dpad.buttonSize, dpad.buttonSize);
+        
+        // 활성화된 버튼 표시 (예: 현재 플레이어가 움직이는 방향)
+        if (this.player.currentMoveDirection) {
+            this.ctx.fillStyle = 'yellow';
+            switch (this.player.currentMoveDirection) {
+                case 'up':
+                    this.ctx.fillRect(centerX - dpad.buttonSize / 2, centerY - dpad.buttonSize / 2 - dpad.buttonSize / 3, dpad.buttonSize, dpad.buttonSize);
+                    break;
+                case 'down':
+                    this.ctx.fillRect(centerX - dpad.buttonSize / 2, centerY + dpad.buttonSize / 2 + dpad.buttonSize / 3 - dpad.buttonSize, dpad.buttonSize, dpad.buttonSize);
+                    break;
+                case 'left':
+                    this.ctx.fillRect(centerX - dpad.buttonSize / 2 - dpad.buttonSize / 3, centerY - dpad.buttonSize / 2, dpad.buttonSize, dpad.buttonSize);
+                    break;
+                case 'right':
+                    this.ctx.fillRect(centerX + dpad.buttonSize / 2 + dpad.buttonSize / 3 - dpad.buttonSize, centerY - dpad.buttonSize / 2, dpad.buttonSize, dpad.buttonSize);
+                    break;
+            }
+        }
+    }
+
     getScores(){ return JSON.parse(localStorage.getItem('ddongman_scores'))||[]; }
     saveScore(name,score){ const scores=this.getScores();scores.push({name:name.substring(0,3).toUpperCase(),score});scores.sort((a,b)=>b.score-a.score);localStorage.setItem('ddongman_scores',JSON.stringify(scores.slice(0,5))); }
     playSound(sfx){ if(sfx&&sfx.src){sfx.currentTime=0;sfx.play().catch(e=>{});} }
@@ -349,7 +511,7 @@ class Character {
     constructor(x, y, speed, width=30, height=30) {
         this.x = x; this.y = y; this.speed = speed; this.width = width; this.height = height;
     }
-    isWall(x, y) {
+    isWall(x, y) { 
         const mapX=Math.floor(x/TILE_SIZE),mapY=Math.floor(y/TILE_SIZE);
         if(MAP[mapY]===undefined||MAP[mapY][mapX]===undefined||MAP[mapY][mapX]===1){return true;}
         return false;
@@ -357,10 +519,20 @@ class Character {
 }
 
 class Player extends Character {
-    constructor(x,y,speed){ super(x,y,speed); this.currentMoveDirection = null; }
+    constructor(x, y, speed, images) {
+        super(x, y, speed);
+        this.currentMoveDirection = null;
+        this.images = images; // 이미지 객체 저장
+        this.facingDirection = 'south'; // 기본 방향 설정 (예: 아래)
+    }
     update(keys, currentMoveDirection, deltaTime){
         let nX=this.x,nY=this.y;
         let moved = false;
+
+        // 방향 업데이트
+        if (currentMoveDirection) {
+            this.facingDirection = currentMoveDirection;
+        }
 
         if (currentMoveDirection) {
             if (currentMoveDirection === 'up') nY -= this.speed * deltaTime * 60;
@@ -369,9 +541,10 @@ class Player extends Character {
             else if (currentMoveDirection === 'right') nX += this.speed * deltaTime * 60;
             moved = true;
         } else { // Fallback to keyboard if no touch target
-            if(keys.ArrowUp)nY-=this.speed * deltaTime * 60;
-            if(keys.ArrowDown)nY+=this.speed * deltaTime * 60;if(keys.ArrowLeft)nX-=this.speed * deltaTime * 60;if(keys.ArrowRight)nX+=this.speed * deltaTime * 60;
-            moved = true;
+            if(keys.ArrowUp) { nY-=this.speed * deltaTime * 60; this.facingDirection = 'up'; moved = true; }
+            if(keys.ArrowDown) { nY+=this.speed * deltaTime * 60; this.facingDirection = 'down'; moved = true; }
+            if(keys.ArrowLeft) { nX-=this.speed * deltaTime * 60; this.facingDirection = 'left'; moved = true; }
+            if(keys.ArrowRight) { nX+=this.speed * deltaTime * 60; this.facingDirection = 'right'; moved = true; }
         }
 
         if (moved && !this.isWall(nX,nY)&&!this.isWall(nX+this.width,nY)&&!this.isWall(nX,nY+this.height)&&!this.isWall(nX+this.width,nY+this.height)){
@@ -381,7 +554,54 @@ class Player extends Character {
             this.currentMoveDirection = null; // Stop movement if hit wall
         }
     }
-    draw(ctx){ctx.fillStyle='white';ctx.fillRect(this.x,this.y+this.height*.4,this.width,this.height*.6);ctx.fillStyle='#ddd';ctx.fillRect(this.x+this.width*.1,this.y,this.width*.8,this.height*.5);ctx.strokeStyle='#999';ctx.lineWidth=2;ctx.strokeRect(this.x,this.y+this.height*.4,this.width,this.height*.6);ctx.strokeRect(this.x+this.width*.1,this.y,this.width*.8,this.height*.5);}
+    draw(ctx){
+        // 이미지가 로드되었는지 확인
+        if (this.images) {
+            // facingDirection에 따라 적절한 이미지 선택
+            let img;
+            switch (this.facingDirection) {
+                case 'up':
+                    img = this.images.north;
+                    break;
+                case 'down':
+                    img = this.images.south;
+                    break;
+                case 'left':
+                    img = this.images.west;
+                    break;
+                case 'right':
+                    img = this.images.east;
+                    break;
+                default:
+                    img = this.images.south; // 기본 이미지
+            }
+            
+            // 이미지 그리기
+            if (img) {
+                ctx.drawImage(img, this.x, this.y, this.width, this.height);
+            } else {
+                // 이미지가 없을 경우 기존 사각형 그리기
+                ctx.fillStyle='white';
+                ctx.fillRect(this.x,this.y+this.height*.4,this.width,this.height*.6);
+                ctx.fillStyle='#ddd';
+                ctx.fillRect(this.x+this.width*.1,this.y,this.width*.8,this.height*.5);
+                ctx.strokeStyle='#999';
+                ctx.lineWidth=2;
+                ctx.strokeRect(this.x,this.y+this.height*.4,this.width,this.height*.6);
+                ctx.strokeRect(this.x+this.width*.1,this.y,this.width*.8,this.height*.5);
+            }
+        } else {
+            // 이미지가 로드되지 않았을 경우 기존 사각형 그리기
+            ctx.fillStyle='white';
+            ctx.fillRect(this.x,this.y+this.height*.4,this.width,this.height*.6);
+            ctx.fillStyle='#ddd';
+            ctx.fillRect(this.x+this.width*.1,this.y,this.width*.8,this.height*.5);
+            ctx.strokeStyle='#999';
+            ctx.lineWidth=2;
+            ctx.strokeRect(this.x,this.y+this.height*.4,this.width,this.height*.6);
+            ctx.strokeRect(this.x+this.width*.1,this.y,this.width*.8,this.height*.5);
+        }
+    }
     dropPoop(poopMap){
         const pTX=Math.floor((this.x+this.width/2)/TILE_SIZE),pTY=Math.floor((this.y+this.height/2)/TILE_SIZE);
         if(MAP[pTY]===undefined||MAP[pTY][pTX]===undefined||MAP[pTY][pTX]===0&&!poopMap[pTY][pTX]){
@@ -444,9 +664,25 @@ class Enemy extends Character {
         }}}
         return null;
     }
-    onPoopEaten(){this.path=[];this.targetPoop=null;this.state='EATING';this.stateTimer=5;
+    onPoopEaten(){this.path=[];this.targetPoop=null;
+    this.state='EATING';
+    this.stateTimer=5;
     }
 }
+
+// Game 클래스에 handleStartOverlayClick 메서드 추가
+Game.prototype.handleStartOverlayClick = function() {
+    if (this.gameState === 'PRE_GAME_OVERLAY') {
+        // 오버레이 숨기기
+        if (this.startGameOverlay) {
+            this.startGameOverlay.style.display = 'none';
+        }
+        // 게임 상태 변경
+        this.gameState = 'CONTROL_SELECTION';
+        // 게임 루프 재시작 (필요한 경우)
+        // this.gameLoop(); // 일반적으로 gameLoop는 계속 실행 중이므로 별도 호출은 필요 없을 수 있음
+    }
+};
 
 class Poop {
     constructor(x,y,tileX,tileY){ this.x=x;this.y=y;this.width=10;this.height=10;this.tileX=tileX;this.tileY=tileY; }
