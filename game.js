@@ -50,13 +50,25 @@ class Game {
     constructor(canvasId) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
-        this.bgmNormal = document.getElementById('bgm-normal');
-        this.bgmFast = document.getElementById('bgm-fast');
-        this.sfxGameOver = document.getElementById('sfx-gameover');
+        this.bgmNormal = new Audio('./BgmNomal.wav');
+        this.bgmFast = new Audio('./BgmFast.wav');
+        this.sfxGameOver = new Audio('./gameover.wav');
         // BGM 미리 로드
         if (this.bgmNormal) this.bgmNormal.load();
         if (this.bgmFast) this.bgmFast.load();
-        this.muteButton = document.getElementById('muteButton');
+        this.muteButton = document.createElement('button');
+        this.muteButton.id = 'muteButton';
+        this.muteButton.textContent = 'Mute';
+        this.muteButton.style.position = 'absolute';
+        this.muteButton.style.top = '10px';
+        this.muteButton.style.right = '10px';
+        this.muteButton.style.zIndex = '100';
+        this.muteButton.style.padding = '5px 10px';
+        this.muteButton.style.background = '#555';
+        this.muteButton.style.color = 'white';
+        this.muteButton.style.border = 'none';
+        this.muteButton.style.cursor = 'pointer';
+        document.body.appendChild(this.muteButton);
         this.startGameOverlay = document.getElementById('startGameOverlay');
         
         this.isMuted = false; // 음소거 상태
@@ -332,8 +344,8 @@ class Game {
         this.enemies.forEach(e => { if (e.speed < ENEMY_MAX_SPEED) e.speed += SPEED_INCREASE_AMOUNT; });
         
         // BGM 속도 조절
-        if (this.bgmNormal.playbackRate < BGM_FAST_THRESHOLD) {
-            if (this.bgmNormal) this.bgmNormal.playbackRate += BGM_RATE_INCREASE_AMOUNT;
+        if (this.bgmNormal && this.bgmNormal.playbackRate < BGM_FAST_THRESHOLD) {
+            this.bgmNormal.playbackRate += BGM_RATE_INCREASE_AMOUNT;
         } else {
             // 임계값 넘으면 fast BGM으로 전환
             if (this.bgmNormal && !this.bgmNormal.paused) this.bgmNormal.pause();
@@ -372,8 +384,8 @@ class Game {
             if (atePoop) enemy.onPoopEaten();
             if (checkCollision(this.player, enemy)) {
                 this.gameState = 'ENTERING_NAME';
-                if (this.bgmNormal) this.bgmNormal.pause();
-                if (this.bgmFast) this.bgmFast.pause();
+                if (this.bgmNormal && !this.bgmNormal.paused) this.bgmNormal.pause();
+                if (this.bgmFast && !this.bgmFast.paused) this.bgmFast.pause();
                 this.playSound(this.sfxGameOver); // 게임 오버 사운드 재생 주석 처리 해제
             }
         });
@@ -814,12 +826,40 @@ class Enemy extends Character {
     }
 }
 
+// Game 클래스에 initBGM 메서드 추가
+Game.prototype.initBGM = function() {
+    if (this.bgmNormal) {
+        this.bgmNormal.playbackRate = BGM_INITIAL_RATE;
+        this.bgmNormal.currentTime = 0;
+        this.bgmNormal.pause();
+    }
+    if (this.bgmFast) {
+        this.bgmFast.playbackRate = BGM_INITIAL_RATE;
+        this.bgmFast.currentTime = 0;
+        this.bgmFast.pause(); // 시작 시에는 fast BGM은 멈춰있음
+    }
+};
+
 // Game 클래스에 handleStartOverlayClick 메서드 추가
 Game.prototype.handleStartOverlayClick = function() {
     if (this.gameState === 'PRE_GAME_OVERLAY') {
         // 오버레이 숨기기
         if (this.startGameOverlay) {
             this.startGameOverlay.style.display = 'none';
+        }
+        // BGM 초기화 및 재생
+        if (this.bgmNormal) {
+            this.bgmNormal.playbackRate = BGM_INITIAL_RATE;
+            this.bgmNormal.currentTime = 0;
+            this.bgmNormal.pause();
+        }
+        if (this.bgmFast) {
+            this.bgmFast.playbackRate = BGM_INITIAL_RATE;
+            this.bgmFast.currentTime = 0;
+            this.bgmFast.pause(); // 시작 시에는 fast BGM은 멈춰있음
+        }
+        if (this.bgmNormal) {
+            this.bgmNormal.play().catch(e => console.log("BGM play error:", e));
         }
         // 게임 상태 변경
         this.gameState = 'CONTROL_SELECTION';
