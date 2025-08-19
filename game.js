@@ -73,28 +73,28 @@ class Game {
     loadImages() {
         const imageFiles = {
             player: {
-                down: 'poop_down.png',
-                left: 'poop_left.png',
-                right: 'poop_Right.png',
-                up: 'poop_up.png'
+                down: './poop_down.png',
+                left: './poop_left.png',
+                right: './poop_Right.png',
+                up: './poop_up.png'
             },
             mob1: {
-                down: 'mob1_down.png',
-                left: 'mob1_left.png',
-                right: 'mob1_Right.png',
-                up: 'mob1_up.png'
+                down: './mob1_down.png',
+                left: './mob1_left.png',
+                right: './mob1_Right.png',
+                up: './mob1_up.png'
             },
             mob2: {
-                down: 'mob2_down.png',
-                left: 'mob2_left.png',
-                right: 'mob2_Right.png',
-                up: 'mob2_up.png'
+                down: './mob2_down.png',
+                left: './mob2_left.png',
+                right: './mob2_Right.png',
+                up: './mob2_up.png'
             },
             mob3: {
-                down: 'mob3_down.png',
-                left: 'mob3_left.png',
-                right: 'mob3_Right.png',
-                up: 'mob3_up.png'
+                down: './mob3_down.png',
+                left: './mob3_left.png',
+                right: './mob3_Right.png',
+                up: './mob3_up.png'
             }
         };
 
