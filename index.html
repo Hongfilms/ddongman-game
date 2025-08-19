@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>똥맨 (Poop-Man)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>똥맨 (Poop-Man)</h1>
+    <!-- 오버레이 추가 -->
+    <div id="startGameOverlay" style="position: absolute; top: 0; left: 0; width:100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index:10; cursor: pointer;">
+        <div style="text-align: center; color: white;">
+            <h2>Click to Start</h2>
+            <p style="font-size: 18px;">(Tap to begin)</p>
+        </div>
+    </div>
+    <canvas id="gameCanvas" width="480" height="640"></canvas>
+    <button id="muteButton" style="position: absolute; top: 10px; right: 10px; z-index: 100; padding: 5px 10px; background: #555; color: white; border: none; cursor: pointer;">Mute</button>
+
+    <script src="game.js"></script>
+
+    <!-- 사운드 파일 로드 -->
+    <div style="display: none;">
+        <audio id="bgm-normal" src="BgmNomal.wav" loop></audio>
+        <audio id="bgm-fast" src="BgmFast.wav" loop></audio>
+        <audio id="sfx-gameover" src="gameover.wav"></audio>
+    </div>
+</body>
+</html>
