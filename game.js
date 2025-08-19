@@ -53,6 +53,9 @@ class Game {
         this.bgmNormal = document.getElementById('bgm-normal');
         this.bgmFast = document.getElementById('bgm-fast');
         this.sfxGameOver = document.getElementById('sfx-gameover');
+        // BGM 미리 로드
+        if (this.bgmNormal) this.bgmNormal.load();
+        if (this.bgmFast) this.bgmFast.load();
         this.muteButton = document.getElementById('muteButton');
         this.startGameOverlay = document.getElementById('startGameOverlay');
         
@@ -69,14 +72,37 @@ class Game {
     // 이미지 로드 메서드 추가
     loadImages() {
         const imageFiles = {
-            east: 'poop_East_Idle.png',
-            north: 'poop_North_Idle.png',
-            south: 'poop_South_Idle.png',
-            west: 'poop_West_Idle.png'
+            player: {
+                down: 'poop_down.png',
+                left: 'poop_left.png',
+                right: 'poop_Right.png',
+                up: 'poop_up.png'
+            },
+            mob1: {
+                down: 'mob1_down.png',
+                left: 'mob1_left.png',
+                right: 'mob1_Right.png',
+                up: 'mob1_up.png'
+            },
+            mob2: {
+                down: 'mob2_down.png',
+                left: 'mob2_left.png',
+                right: 'mob2_Right.png',
+                up: 'mob2_up.png'
+            },
+            mob3: {
+                down: 'mob3_down.png',
+                left: 'mob3_left.png',
+                right: 'mob3_Right.png',
+                up: 'mob3_up.png'
+            }
         };
 
-        const promises = Object.keys(imageFiles).map(key => {
-            return new Promise((resolve, reject) => {
+        const promises = [];
+
+        // 플레이어 이미지 로드
+        Object.keys(imageFiles.player).forEach(key => {
+            promises.push(new Promise((resolve, reject) => {
                 const img = new Image();
                 img.onload = () => {
                     this.playerImages = this.playerImages || {};
@@ -84,11 +110,31 @@ class Game {
                     resolve();
                 };
                 img.onerror = reject;
-                img.src = imageFiles[key];
-            });
+                img.src = imageFiles.player[key];
+            }));
         });
 
-        return Promise.all(promises);
+        // 몹 이미지 로드
+        for (let i = 1; i <= 3; i++) {
+            const mobKey = `mob${i}`;
+            Object.keys(imageFiles[mobKey]).forEach(key => {
+                promises.push(new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.enemyImages = this.enemyImages || {};
+                        this.enemyImages[mobKey] = this.enemyImages[mobKey] || {};
+                        this.enemyImages[mobKey][key] = img;
+                        resolve();
+                    };
+                    img.onerror = reject;
+                    img.src = imageFiles[mobKey][key];
+                }));
+            });
+        }
+
+        return Promise.all(promises).then(() => {
+            console.log('모든 이미지 로드 완료:', this.playerImages, this.enemyImages);
+        });
     }
 
     init() {
@@ -113,6 +159,19 @@ class Game {
         this.difficultyTimer = setInterval(() => this.increaseDifficulty(), SPEED_INCREASE_INTERVAL);
         
         // BGM 초기화 (재생은 overlay 클릭 후)
+        this.initBGM();
+
+        if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+        this.gameLoop(); // 게임 루프는 여기서 시작하지만, 실제 플레이는 overlay 클릭 후
+
+        // 시작 오버레이 표시
+        if (this.startGameOverlay) {
+            this.startGameOverlay.style.display = 'flex';
+        }
+    }
+
+    // BGM 초기화 메서드 추가
+    initBGM() {
         if (this.bgmNormal) {
             this.bgmNormal.playbackRate = BGM_INITIAL_RATE;
             this.bgmNormal.currentTime = 0;
@@ -122,14 +181,6 @@ class Game {
             this.bgmFast.playbackRate = BGM_INITIAL_RATE;
             this.bgmFast.currentTime = 0;
             this.bgmFast.pause(); // 시작 시에는 fast BGM은 멈춰있음
-        }
-
-        if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
-        this.gameLoop(); // 게임 루프는 여기서 시작하지만, 실제 플레이는 overlay 클릭 후
-
-        // 시작 오버레이 표시
-        if (this.startGameOverlay) {
-            this.startGameOverlay.style.display = 'flex';
         }
     }
 
@@ -270,7 +321,12 @@ class Game {
 
     createEnemies() {
         const spawnPoints=[{x:TILE_SIZE*10+5,y:TILE_SIZE+5},{x:TILE_SIZE+5,y:TILE_SIZE*14+5},{x:TILE_SIZE*10+5,y:TILE_SIZE*14+5}];
-        for(let i=0;i<ENEMY_COUNT;i++){ const sp=spawnPoints[i%spawnPoints.length];this.enemies.push(new Enemy(sp.x,sp.y,ENEMY_INITIAL_SPEED));}
+        const mobTypes = ['mob1', 'mob2', 'mob3']; // 몹 종류 배열
+        for(let i=0;i<ENEMY_COUNT;i++){ 
+            const sp=spawnPoints[i%spawnPoints.length];
+            const mobType = mobTypes[i % mobTypes.length]; // 몹 종류 순환
+            this.enemies.push(new Enemy(sp.x, sp.y, ENEMY_INITIAL_SPEED, this.enemyImages, mobType));
+        }
     }
 
     increaseDifficulty() {
@@ -389,9 +445,25 @@ class Game {
         let displayName = this.currentName.join('') + '_'.repeat(3 - this.currentName.length);
         this.ctx.fillText(displayName, this.canvas.width/2, 250);
         this.ctx.font='24px sans-serif';
-        let currentX = this.keyboard.x;
+        
+        // 키보드 중앙 정렬을 위한 전체 너비 계산
+        let keyboardWidth = 0;
+        if (KEYBOARD_LAYOUT.length > 0) {
+            let currentX = 0;
+            for (let c = 0; c < KEYBOARD_LAYOUT[0].length; c++) {
+                const key = KEYBOARD_LAYOUT[0][c];
+                const keyWidth = key.length > 2 ? this.keyboard.keySize*2.5 : (key.length > 1 ? this.keyboard.keySize*1.5 : this.keyboard.keySize);
+                currentX += keyWidth + 5;
+            }
+            keyboardWidth = currentX - 5; // 마지막 키 뒤의 간격 제거
+        }
+        
+        // 키보드 시작 X 좌표 계산 (중앙 정렬)
+        const keyboardStartX = (this.canvas.width - keyboardWidth) / 2;
+        
+        let currentX = keyboardStartX;
         for(let r=0; r<KEYBOARD_LAYOUT.length; r++) {
-            currentX = this.keyboard.x;
+            currentX = keyboardStartX; // 각 행의 시작 X 좌표를 재설정
             for (let c=0; c<KEYBOARD_LAYOUT[r].length; c++) {
                 const key = KEYBOARD_LAYOUT[r][c];
                 const keyWidth = key.length > 2 ? this.keyboard.keySize*2.5 : (key.length > 1 ? this.keyboard.keySize*1.5 : this.keyboard.keySize);
@@ -523,7 +595,7 @@ class Player extends Character {
         super(x, y, speed);
         this.currentMoveDirection = null;
         this.images = images; // 이미지 객체 저장
-        this.facingDirection = 'south'; // 기본 방향 설정 (예: 아래)
+        this.facingDirection = 'down'; // 기본 방향 설정 (예: 아래)
     }
     update(keys, currentMoveDirection, deltaTime){
         let nX=this.x,nY=this.y;
@@ -555,31 +627,36 @@ class Player extends Character {
         }
     }
     draw(ctx){
+        // console.log('Player draw called', this.images, this.facingDirection); // 디버그 로그 추가
         // 이미지가 로드되었는지 확인
         if (this.images) {
+            // console.log('Player images available'); // 디버그 로그 추가
             // facingDirection에 따라 적절한 이미지 선택
             let img;
             switch (this.facingDirection) {
                 case 'up':
-                    img = this.images.north;
+                    img = this.images.up;
                     break;
                 case 'down':
-                    img = this.images.south;
+                    img = this.images.down;
                     break;
                 case 'left':
-                    img = this.images.west;
+                    img = this.images.left;
                     break;
                 case 'right':
-                    img = this.images.east;
+                    img = this.images.right;
                     break;
                 default:
-                    img = this.images.south; // 기본 이미지
+                    img = this.images.down; // 기본 이미지
             }
+            // console.log('Selected player image:', img); // 디버그 로그 추가
             
             // 이미지 그리기
             if (img) {
+                // console.log('Drawing player image'); // 디버그 로그 추가
                 ctx.drawImage(img, this.x, this.y, this.width, this.height);
             } else {
+                // console.log('Player image not found for direction, drawing default shape'); // 디버그 로그 추가
                 // 이미지가 없을 경우 기존 사각형 그리기
                 ctx.fillStyle='white';
                 ctx.fillRect(this.x,this.y+this.height*.4,this.width,this.height*.6);
@@ -591,6 +668,7 @@ class Player extends Character {
                 ctx.strokeRect(this.x+this.width*.1,this.y,this.width*.8,this.height*.5);
             }
         } else {
+            // console.log('Player images not loaded, drawing default shape'); // 디버그 로그 추가
             // 이미지가 로드되지 않았을 경우 기존 사각형 그리기
             ctx.fillStyle='white';
             ctx.fillRect(this.x,this.y+this.height*.4,this.width,this.height*.6);
@@ -614,7 +692,16 @@ class Player extends Character {
 }
 
 class Enemy extends Character {
-    constructor(x,y,speed){ super(x,y,speed);this.state='CHASING';this.stateTimer=0;this.targetPoop=null;this.path=[]; }
+    constructor(x, y, speed, images, mobType) {
+        super(x, y, speed);
+        this.state='CHASING';
+        this.stateTimer=0;
+        this.targetPoop=null;
+        this.path=[];
+        this.images = images; // 이미지 객체 저장
+        this.mobType = mobType; // 몹의 종류 저장 (mob1, mob2, mob3)
+        this.facingDirection = 'down'; // 기본 방향 설정 (예: 아래)
+    }
     update(poops,player,allEnemies, deltaTime){
         if(this.state==='EATING'){if(--this.stateTimer<=0)this.state='CHASING';return;}
         if(this.state==='CHASING'){
@@ -643,6 +730,16 @@ class Enemy extends Character {
                 const tY=tN.y*TILE_SIZE+(TILE_SIZE-this.height)/2;
                 const oX=this.x,oY=this.y;
                 const dx=tX-this.x,dy=tY-this.y;
+                
+                // 방향 업데이트
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    if (dx > 0) this.facingDirection = 'right';
+                    else if (dx < 0) this.facingDirection = 'left';
+                } else {
+                    if (dy > 0) this.facingDirection = 'down';
+                    else if (dy < 0) this.facingDirection = 'up';
+                }
+                
                 if(Math.abs(dx)>0)this.x+=Math.sign(dx)*this.speed * deltaTime * 60;
                 if(this.isWall(this.x,this.y)||this.isWall(this.x+this.width,this.y)||this.isWall(this.x,this.y+this.height)||this.isWall(this.x+this.width,this.y+this.height)){
                     this.x=oX;
@@ -657,7 +754,55 @@ class Enemy extends Character {
             }
         }
     }
-    draw(ctx){ctx.fillStyle='#A0522D';ctx.fillRect(this.x+this.width*.4,this.y,this.width*.2,this.height*.7);ctx.fillStyle='red';ctx.fillRect(this.x,this.y+this.height*.7,this.width,this.height*.3);}
+    draw(ctx){
+        // console.log('Enemy draw called', this.images, this.mobType, this.facingDirection); // 디버그 로그 추가
+        // 이미지가 로드되었는지 확인
+        if (this.images && this.mobType) {
+            // console.log('Enemy images and mobType available'); // 디버그 로그 추가
+            // mobType과 facingDirection에 따라 적절한 이미지 선택
+            let img;
+            if (this.images[this.mobType]) {
+                // console.log('Enemy mobType images found'); // 디버그 로그 추가
+                switch (this.facingDirection) {
+                    case 'up':
+                        img = this.images[this.mobType].up;
+                        break;
+                    case 'down':
+                        img = this.images[this.mobType].down;
+                        break;
+                    case 'left':
+                        img = this.images[this.mobType].left;
+                        break;
+                    case 'right':
+                        img = this.images[this.mobType].right;
+                        break;
+                    default:
+                        img = this.images[this.mobType].down; // 기본 이미지
+                }
+            }
+            // console.log('Selected enemy image:', img); // 디버그 로그 추가
+            
+            // 이미지 그리기
+            if (img) {
+                // console.log('Drawing enemy image'); // 디버그 로그 추가
+                ctx.drawImage(img, this.x, this.y, this.width, this.height);
+            } else {
+                // console.log('Enemy image not found for direction, drawing default shape'); // 디버그 로그 추가
+                // 이미지가 없을 경우 기존 사각형 그리기
+                ctx.fillStyle='#A0522D';
+                ctx.fillRect(this.x+this.width*.4,this.y,this.width*.2,this.height*.7);
+                ctx.fillStyle='red';
+                ctx.fillRect(this.x,this.y+this.height*.7,this.width,this.height*.3);
+            }
+        } else {
+            // console.log('Enemy images or mobType not loaded, drawing default shape'); // 디버그 로그 추가
+            // 이미지가 로드되지 않았을 경우 기존 사각형 그리기
+            ctx.fillStyle='#A0522D';
+            ctx.fillRect(this.x+this.width*.4,this.y,this.width*.2,this.height*.7);
+            ctx.fillStyle='red';
+            ctx.fillRect(this.x,this.y+this.height*.7,this.width,this.height*.3);
+        }
+    }
     findPath(end){const sN={x:Math.floor(this.x/TILE_SIZE),y:Math.floor(this.y/TILE_SIZE)},eN={x:Math.floor(end.x/TILE_SIZE),y:Math.floor(end.y/TILE_SIZE)};if(MAP[eN.y]===undefined||MAP[eN.y][eN.x]===1)return null;const q=[[sN]],v=new Set([`${sN.y},${sN.x}`]);while(q.length>0){const p=q.shift(),n=p[p.length-1];if(n.x===eN.x&&n.y===eN.y)return p;const N=[[0,-1],[0,1],[-1,0],[1,0]];for(const[dx,dy]of N){const next={x:n.x+dx,y:n.y+dy};if(next.x>=0&&next.x<MAP_COLS&&next.y>=0&&next.y<MAP_ROWS&&MAP[next.y][next.x]===0&&!v.has(`${next.y},${next.x}`)){
             v.add(`${next.y},${next.x}`);
             q.push([...p,next]);
@@ -670,19 +815,24 @@ class Enemy extends Character {
     }
 }
 
-// Game 클래스에 handleStartOverlayClick 메서드 추가
-Game.prototype.handleStartOverlayClick = function() {
-    if (this.gameState === 'PRE_GAME_OVERLAY') {
-        // 오버레이 숨기기
-        if (this.startGameOverlay) {
-            this.startGameOverlay.style.display = 'none';
+// Game 클래스 내부에 handleStartOverlayClick 메서드 추가
+    handleStartOverlayClick() {
+        if (this.gameState === 'PRE_GAME_OVERLAY') {
+            // 오버레이 숨기기
+            if (this.startGameOverlay) {
+                this.startGameOverlay.style.display = 'none';
+            }
+            // BGM 초기화 및 재생
+            this.initBGM();
+            if (this.bgmNormal) {
+                this.bgmNormal.play().catch(e => console.log("BGM play error:", e));
+            }
+            // 게임 상태 변경
+            this.gameState = 'CONTROL_SELECTION';
+            // 게임 루프 재시작 (필요한 경우)
+            // this.gameLoop(); // 일반적으로 gameLoop는 계속 실행 중이므로 별도 호출은 필요 없을 수 있음
         }
-        // 게임 상태 변경
-        this.gameState = 'CONTROL_SELECTION';
-        // 게임 루프 재시작 (필요한 경우)
-        // this.gameLoop(); // 일반적으로 gameLoop는 계속 실행 중이므로 별도 호출은 필요 없을 수 있음
     }
-};
 
 class Poop {
     constructor(x,y,tileX,tileY){ this.x=x;this.y=y;this.width=10;this.height=10;this.tileX=tileX;this.tileY=tileY; }
