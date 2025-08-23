@@ -859,31 +859,31 @@ class Game {
     }
 
     drawUI() {
-        // 상단 정보 패널
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        this.ctx.fillRect(5, 5, this.canvas.width - 10, 60);
-        this.ctx.strokeStyle = 'rgba(74, 144, 226, 0.8)';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(5, 5, this.canvas.width - 10, 60);
+        // 상단 정보 패널 - 더 작고 투명하게
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        this.ctx.fillRect(5, 5, this.canvas.width - 10, 40);
+        this.ctx.strokeStyle = 'rgba(74, 144, 226, 0.5)';
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeRect(5, 5, this.canvas.width - 10, 40);
         
-        // 점수와 레벨
+        // 점수와 스테이지 - 한 줄로 압축
         this.ctx.fillStyle = 'white';
-        this.ctx.font = 'bold 16px Arial';
+        this.ctx.font = 'bold 14px Arial';
         this.ctx.textAlign = 'left';
-        this.ctx.fillText(`⏱️ ${this.score}초`, 12, 25);
-        this.ctx.fillText(`🏆 스테이지 ${this.currentStage}`, 12, 45);
+        this.ctx.fillText(`⏱️ ${this.score}초 | 🏆 Stage ${this.currentStage}`, 12, 25);
         
-        // 레벨과 경험치
+        // 레벨과 경험치 - 더 작게
         const expPercent = (this.experience / (this.level * 100)) * 100;
-        this.ctx.fillText(`Lv.${this.level}`, this.canvas.width - 80, 25);
+        this.ctx.font = 'bold 12px Arial';
+        this.ctx.fillText(`Lv.${this.level}`, this.canvas.width - 70, 20);
         
-        // 경험치 바
-        const expBarWidth = 60;
-        const expBarX = this.canvas.width - 75;
+        // 경험치 바 - 더 작게
+        const expBarWidth = 50;
+        const expBarX = this.canvas.width - 65;
         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        this.ctx.fillRect(expBarX, 30, expBarWidth, 8);
+        this.ctx.fillRect(expBarX, 25, expBarWidth, 6);
         this.ctx.fillStyle = '#4ecdc4';
-        this.ctx.fillRect(expBarX, 30, (expBarWidth * expPercent) / 100, 8);
+        this.ctx.fillRect(expBarX, 25, (expBarWidth * expPercent) / 100, 6);
         
         // 스킬 UI (모바일에서만)
         if (this.controlMode === 'MOBILE') {
@@ -915,91 +915,91 @@ class Game {
             this.ctx.restore();
         }
         
-        // 초보자 안내
+        // 초보자 안내 - 위치 조정
         if (this.score < 5) {
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-            this.ctx.font = '14px Arial';
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            this.ctx.font = '12px Arial';
             this.ctx.textAlign = 'center';
             if (this.controlMode === 'MOBILE') {
-                this.ctx.fillText('스와이프: 이동 | 스킬버튼: 특수능력', this.canvas.width / 2, 85);
+                this.ctx.fillText('스와이프: 이동 | 스킬버튼: 특수능력', this.canvas.width / 2, 60);
             } else {
-                this.ctx.fillText('방향키: 이동 | Q,W,E,R: 스킬', this.canvas.width / 2, 85);
+                this.ctx.fillText('방향키: 이동 | Q,W,E,R: 스킬', this.canvas.width / 2, 60);
             }
         }
     }
     
     drawSkillButtons() {
         const skillIds = ['dash', 'shield', 'freeze', 'bomb'];
-        const buttonSize = 40;
-        const startX = this.canvas.width - 200;
-        const startY = this.canvas.height - 60;
+        const buttonSize = 32; // 더 작게
+        const startX = this.canvas.width - 150;
+        const startY = this.canvas.height - 50;
         
         skillIds.forEach((skillId, index) => {
             const skill = this.skills[skillId];
-            const x = startX + (index * 45);
+            const x = startX + (index * 36);
             const y = startY;
             
             // 스킬이 해금되지 않았으면 회색으로
             if (!skill.unlocked) {
-                this.ctx.fillStyle = 'rgba(100, 100, 100, 0.5)';
+                this.ctx.fillStyle = 'rgba(100, 100, 100, 0.3)';
             } else {
                 const now = Date.now();
                 const cooldownRemaining = Math.max(0, skill.cooldown - (now - skill.lastUsed));
                 
                 if (cooldownRemaining > 0) {
-                    this.ctx.fillStyle = 'rgba(200, 100, 100, 0.7)';
+                    this.ctx.fillStyle = 'rgba(200, 100, 100, 0.4)';
                 } else {
-                    this.ctx.fillStyle = 'rgba(74, 144, 226, 0.8)';
+                    this.ctx.fillStyle = 'rgba(74, 144, 226, 0.5)';
                 }
             }
             
-            // 버튼 배경
+            // 버튼 배경 - 더 투명하게
             this.ctx.fillRect(x, y, buttonSize, buttonSize);
-            this.ctx.strokeStyle = 'white';
-            this.ctx.lineWidth = 2;
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            this.ctx.lineWidth = 1;
             this.ctx.strokeRect(x, y, buttonSize, buttonSize);
             
-            // 스킬 아이콘
+            // 스킬 아이콘 - 더 작게
             this.ctx.fillStyle = 'white';
-            this.ctx.font = '20px Arial';
+            this.ctx.font = '16px Arial';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
             this.ctx.fillText(skill.icon, x + buttonSize/2, y + buttonSize/2);
             
-            // 쿨다운 표시
+            // 쿨다운 표시 - 더 작게
             if (skill.unlocked) {
                 const now = Date.now();
                 const cooldownRemaining = Math.max(0, skill.cooldown - (now - skill.lastUsed));
                 if (cooldownRemaining > 0) {
                     this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                    this.ctx.font = '12px Arial';
-                    this.ctx.fillText(Math.ceil(cooldownRemaining / 1000), x + buttonSize/2, y + buttonSize + 12);
+                    this.ctx.font = '10px Arial';
+                    this.ctx.fillText(Math.ceil(cooldownRemaining / 1000), x + buttonSize/2, y + buttonSize + 10);
                 }
             }
         });
     }
     
     drawActivePowerups() {
-        let yOffset = 70;
+        let yOffset = 50; // 상단 패널 크기에 맞춰 조정
         this.activePowerups.forEach(powerup => {
             const data = POWERUPS[powerup.type];
             const remaining = Math.max(0, powerup.duration - (Date.now() - powerup.startTime));
             
             if (remaining > 0) {
-                // 파워업 아이콘
-                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                this.ctx.fillRect(this.canvas.width - 50, yOffset, 40, 25);
+                // 파워업 아이콘 - 더 작고 투명하게
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                this.ctx.fillRect(this.canvas.width - 35, yOffset, 30, 20);
                 this.ctx.fillStyle = data.color;
-                this.ctx.font = '16px Arial';
+                this.ctx.font = '12px Arial';
                 this.ctx.textAlign = 'center';
-                this.ctx.fillText(data.icon, this.canvas.width - 30, yOffset + 18);
+                this.ctx.fillText(data.icon, this.canvas.width - 20, yOffset + 14);
                 
-                // 남은 시간
+                // 남은 시간 - 더 작게
                 this.ctx.fillStyle = 'white';
-                this.ctx.font = '10px Arial';
-                this.ctx.fillText(Math.ceil(remaining / 1000), this.canvas.width - 30, yOffset + 35);
+                this.ctx.font = '8px Arial';
+                this.ctx.fillText(Math.ceil(remaining / 1000), this.canvas.width - 20, yOffset + 28);
                 
-                yOffset += 40;
+                yOffset += 30; // 간격 줄임
             }
         });
     }
