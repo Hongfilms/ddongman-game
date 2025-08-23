@@ -20,6 +20,22 @@ html, body {
     touch-action: manipulation;
 }
 
+/* 시작 오버레이 터치 최적화 */
+#startGameOverlay {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+}
+
+#startButton {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+}
+
+#startButton:hover, #startButton:active {
+    background: rgba(74, 144, 226, 1) !important;
+    transform: scale(0.95);
+}
+
 body {
     display: flex;
     flex-direction: column;
@@ -43,11 +59,22 @@ body {
 canvas {
     background-color: #000;
     border: 3px solid #4a90e2;
-    border-radius: 8px;
-    box-shadow: 0 0 20px rgba(74, 144, 226, 0.3);
+    border-radius: 12px;
+    box-shadow: 
+        0 0 30px rgba(74, 144, 226, 0.4),
+        0 0 60px rgba(74, 144, 226, 0.2),
+        inset 0 0 20px rgba(0, 0, 0, 0.3);
     max-width: 100vw;
     max-height: 100vh;
     object-fit: contain;
+    transition: box-shadow 0.3s ease;
+}
+
+canvas:hover {
+    box-shadow: 
+        0 0 40px rgba(74, 144, 226, 0.6),
+        0 0 80px rgba(74, 144, 226, 0.3),
+        inset 0 0 20px rgba(0, 0, 0, 0.3);
 }
 
 h1 {
@@ -116,4 +143,151 @@ h1 {
 
 .loading {
     animation: pulse 1.5s ease-in-out infinite;
+}/
+* 개선된 UI 스타일 */
+.game-ui-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.score-display {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px 15px;
+    border-radius: 20px;
+    border: 2px solid rgba(74, 144, 226, 0.5);
+    backdrop-filter: blur(10px);
+    font-weight: bold;
+    font-size: 16px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+.level-display {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(255, 215, 0, 0.2);
+    padding: 8px 15px;
+    border-radius: 20px;
+    border: 2px solid rgba(255, 215, 0, 0.6);
+    backdrop-filter: blur(10px);
+    font-weight: bold;
+    font-size: 16px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+.skill-cooldown-overlay {
+    position: absolute;
+    background: rgba(255, 0, 0, 0.6);
+    border-radius: 50%;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+/* 파티클 효과 */
+@keyframes particle-float {
+    0% { 
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+    100% { 
+        transform: translateY(-50px) scale(0.5);
+        opacity: 0;
+    }
+}
+
+.particle {
+    animation: particle-float 1s ease-out forwards;
+}
+
+/* 스테이지 전환 효과 */
+@keyframes stage-transition {
+    0% { 
+        transform: scale(0.5);
+        opacity: 0;
+    }
+    50% { 
+        transform: scale(1.2);
+        opacity: 1;
+    }
+    100% { 
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.stage-transition {
+    animation: stage-transition 0.8s ease-out;
+}
+
+/* 스킬 버튼 개선 */
+.skill-button {
+    background: rgba(74, 144, 226, 0.3);
+    border: 2px solid rgba(74, 144, 226, 0.6);
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s ease;
+}
+
+.skill-button:hover {
+    background: rgba(74, 144, 226, 0.5);
+    border-color: #4a90e2;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(74, 144, 226, 0.4);
+}
+
+.skill-button.cooldown {
+    background: rgba(255, 0, 0, 0.3);
+    border-color: rgba(255, 0, 0, 0.6);
+    cursor: not-allowed;
+}
+
+/* 모바일 터치 피드백 개선 */
+@media (max-width: 768px) {
+    .touch-button:active {
+        background: rgba(74, 144, 226, 0.7);
+        border-color: #4a90e2;
+        transform: scale(0.9);
+        box-shadow: 0 0 20px rgba(74, 144, 226, 0.6);
+    }
+    
+    .score-display, .level-display {
+        font-size: 14px;
+        padding: 6px 12px;
+    }
+}
+
+/* 게임 오버 화면 개선 */
+.game-over-overlay {
+    background: linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(26,26,46,0.9) 100%);
+    backdrop-filter: blur(15px);
+    border: 2px solid rgba(74, 144, 226, 0.3);
+    border-radius: 15px;
+}
+
+/* 리더보드 스타일 개선 */
+.leaderboard-entry {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.leaderboard-entry:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(74, 144, 226, 0.5);
+    transform: translateX(5px);
 }

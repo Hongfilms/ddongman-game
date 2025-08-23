@@ -3,41 +3,126 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
-    <title>똥맨 (Poop-Man)</title>
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="description" content="재미있는 HTML5 브라우저 게임 - 똥맨! 변기가 되어 똥을 떨어뜨리고 플런저들을 피해보세요!">
+    <meta name="keywords" content="게임, HTML5, 브라우저게임, 똥맨, 아케이드">
+    
+    <!-- PWA 지원 -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    
+    <title>똥맨 (Poop-Man) - 재미있는 브라우저 게임</title>
     <link rel="stylesheet" href="style.css">
+    
+    <!-- 성능 최적화를 위한 preload -->
+    <link rel="preload" href="BgmNomal.wav" as="audio">
+    <link rel="preload" href="poop_down.png" as="image">
+    <link rel="preload" href="mob1_down.png" as="image">
 </head>
 
 <body>
+    <!-- 로딩 화면 -->
+    <div id="loadingScreen" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-family: Arial, sans-serif;
+        z-index: 9999;
+    ">
+        <h1 style="margin-bottom: 20px; font-size: 2.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">🚽 똥맨</h1>
+        <div class="loading" style="font-size: 1.2rem;">게임 로딩 중...</div>
+        <div style="margin-top: 20px; width: 200px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden;">
+            <div id="loadingBar" style="width: 0%; height: 100%; background: #4a90e2; transition: width 0.3s ease;"></div>
+        </div>
+    </div>
+
     <div id="gameContainer">
         <h1>똥맨 (Poop-Man)</h1>
-        <!-- 개선된 시작 오버레이 -->
-        <div id="startGameOverlay"
-            style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: linear-gradient(135deg, rgba(26,26,46,0.95) 0%, rgba(22,33,62,0.95) 50%, rgba(15,52,96,0.95) 100%); display: flex; justify-content: center; align-items: center; z-index: 1000; cursor: pointer; backdrop-filter: blur(5px);">
-            <div
-                style="text-align: center; color: white; padding: 20px; border-radius: 15px; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);">
-                <h2
-                    style="margin: 0 0 15px 0; font-size: clamp(1.5rem, 5vw, 2.5rem); text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
-                    🎮 게임 시작</h2>
-                <p style="font-size: clamp(1rem, 3vw, 1.2rem); margin: 0; opacity: 0.9;">화면을 터치하여 시작하세요</p>
-                <div style="margin-top: 15px; font-size: 2rem;">👆</div>
-            </div>
-        </div>
         <canvas id="gameCanvas" width="480" height="640"></canvas>
     </div>
 
-    <script src="game.js"></script>
-
-    <!-- 사운드 파일 로드 -->
-    <div style="display: none;">
-        <audio id="bgm-normal" src="BgmNomal.wav" loop></audio>
-        <audio id="bgm-fast" src="BgmFast.wav" loop></audio>
-        <audio id="sfx-gameover" src="gameover.wav"></audio>
+    <!-- 오류 메시지 표시용 -->
+    <div id="errorMessage" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,0,0,0.9); color: white; padding: 20px; border-radius: 10px; text-align: center; z-index: 10000;">
+        <h3>오류 발생</h3>
+        <p id="errorText"></p>
+        <button onclick="window.location.reload()" style="padding: 10px 20px; background: white; color: #333; border: none; border-radius: 5px; cursor: pointer;">새로고침</button>
     </div>
+
+    <script>
+        console.log('HTML 스크립트 시작');
+        
+        // 로딩 진행률 업데이트
+        let loadingProgress = 0;
+        window.updateLoadingProgress = (progress) => {
+            console.log('로딩 진행률:', progress + '%');
+            loadingProgress = Math.min(100, progress);
+            const loadingBar = document.getElementById('loadingBar');
+            if (loadingBar) {
+                loadingBar.style.width = loadingProgress + '%';
+            }
+            
+            // 로딩 완료 시 화면 숨기기
+            if (loadingProgress >= 100) {
+                console.log('로딩 완료, 화면 전환 시작');
+                setTimeout(() => {
+                    const loadingScreen = document.getElementById('loadingScreen');
+                    if (loadingScreen) {
+                        loadingScreen.style.opacity = '0';
+                        loadingScreen.style.transition = 'opacity 0.5s ease';
+                        setTimeout(() => {
+                            loadingScreen.style.display = 'none';
+                            console.log('로딩 화면 숨김 완료');
+                        }, 500);
+                    }
+                }, 300);
+            }
+        };
+
+        // 전역 오류 처리
+        window.addEventListener('error', (event) => {
+            console.error('전역 오류:', event.error);
+            
+            // 로딩 화면 숨기기
+            const loadingScreen = document.getElementById('loadingScreen');
+            if (loadingScreen) {
+                loadingScreen.style.display = 'none';
+            }
+            
+            // 오류 메시지 표시
+            const errorMessage = document.getElementById('errorMessage');
+            const errorText = document.getElementById('errorText');
+            if (errorMessage && errorText) {
+                errorText.textContent = '게임 실행 중 오류가 발생했습니다: ' + event.error.message;
+                errorMessage.style.display = 'block';
+            }
+        });
+
+        // 초기 로딩 진행률
+        console.log('초기 로딩 진행률 설정');
+        window.updateLoadingProgress(10);
+        
+        // DOM 로드 완료 후 추가 진행률 업데이트
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM 로드 완료');
+            window.updateLoadingProgress(20);
+        });
+    </script>
+    
+    <script src="game.js"></script>
 </body>
 
 </html>

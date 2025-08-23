@@ -1,41 +1,145 @@
 document.addEventListener('DOMContentLoaded', () => {
-    new Game('gameCanvas');
+    console.log('DOM 로드 완료, 게임 초기화 시작');
+    
+    // 로딩 진행률 업데이트
+    if (window.updateLoadingProgress) {
+        window.updateLoadingProgress(30);
+    }
+    
+    try {
+        window.gameInstance = new Game('gameCanvas');
+        console.log('게임 초기화 완료');
+    } catch (error) {
+        console.error('게임 초기화 실패:', error);
+        // 로딩 화면 숨기기
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.style.display = 'none';
+        }
+        
+        // 오류 메시지 표시
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        if (errorMessage && errorText) {
+            errorText.textContent = '게임 초기화 중 오류가 발생했습니다: ' + error.message;
+            errorMessage.style.display = 'block';
+        }
+    }
 });
 
 // --- 상수 정의 ---
 const TILE_SIZE = 40;
-const MAP = [
-    [1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,1,1,0,1,1,0,1,1,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,1,0,1,1,1,1,0,1,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,1,1,1,1,1,1,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,0,1,1,1,1,0,1,1,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,1,1,1,0,0,1,1,1,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,1,0,1,1,1,1,0,1,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1],
-];
+
+// 스테이지별 맵 정의
+const MAPS = {
+    1: [ // 스테이지 1: 기본 맵
+        [1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,0,1,1,0,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,0,1,1,1,1,0,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,1,1,1,1,1,1,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,0,1,1,1,1,0,1,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,1,0,0,1,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,0,1,1,1,1,0,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1],
+    ],
+    2: [ // 스테이지 2: 미로 맵
+        [1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,1,0,0,1,0,0,0,1],
+        [1,0,1,0,1,0,1,1,0,1,0,1],
+        [1,0,1,0,0,0,0,0,0,1,0,1],
+        [1,0,1,1,1,0,0,1,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,0,1,1,1,1,0,1,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,1,0,0,1,1,1,0,1],
+        [1,0,1,0,0,0,0,0,0,1,0,1],
+        [1,0,1,0,1,0,1,1,0,1,0,1],
+        [1,0,0,0,1,0,0,1,0,0,0,1],
+        [1,0,1,1,1,0,0,1,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1],
+    ],
+    3: [ // 스테이지 3: 십자 맵
+        [1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,1,1,0,0,0,0,1],
+        [1,0,1,1,0,1,1,0,1,1,0,1],
+        [1,0,1,1,0,0,0,0,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,0,0,0,0,0,0,1,1,1],
+        [1,1,1,0,0,0,0,0,0,1,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,0,0,0,0,1,1,0,1],
+        [1,0,1,1,0,1,1,0,1,1,0,1],
+        [1,0,0,0,0,1,1,0,0,0,0,1],
+        [1,0,1,0,1,1,1,1,0,1,0,1],
+        [1,0,1,0,0,0,0,0,0,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1],
+    ],
+    4: [ // 스테이지 4: 복잡한 맵
+        [1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,1,0,0,0,0,0,0,1,0,1],
+        [1,0,1,0,1,1,1,1,0,1,0,1],
+        [1,0,0,0,1,0,0,1,0,0,0,1],
+        [1,1,0,1,1,0,0,1,1,0,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,0,1,1,0,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,0,1,1,0,0,1,1,0,1,1],
+        [1,0,0,0,1,0,0,1,0,0,0,1],
+        [1,0,1,0,1,1,1,1,0,1,0,1],
+        [1,0,1,0,0,0,0,0,0,1,0,1],
+        [1,0,1,1,0,1,1,0,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1],
+    ],
+    5: [ // 스테이지 5: 원형 맵
+        [1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,1,1,1,1,1,1,0,0,1],
+        [1,0,1,0,0,0,0,0,0,1,0,1],
+        [1,1,0,0,1,0,0,1,0,0,1,1],
+        [1,1,0,1,0,0,0,0,1,0,1,1],
+        [1,1,0,0,0,0,0,0,0,0,1,1],
+        [1,1,0,0,0,0,0,0,0,0,1,1],
+        [1,1,0,1,0,0,0,0,1,0,1,1],
+        [1,1,0,0,1,0,0,1,0,0,1,1],
+        [1,0,1,0,0,0,0,0,0,1,0,1],
+        [1,0,0,1,1,1,1,1,1,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,0,1,1,1,1,0,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1],
+    ]
+};
+
+// 현재 맵 참조 (동적으로 변경됨)
+let MAP = MAPS[1];
 const MAP_COLS = MAP[0].length;
 const MAP_ROWS = MAP.length;
 
-// 게임 밸런스 상수
+// 게임 밸런스 상수 (속도 개선)
 const ENEMY_COUNT = 3;
-const ENEMY_INITIAL_SPEED = 1.0;
-const ENEMY_MAX_SPEED = 4;
-const SPEED_INCREASE_INTERVAL = 15000; // 15초마다 난이도 증가
-const SPEED_INCREASE_AMOUNT = 0.15;
+const ENEMY_INITIAL_SPEED = 80; // 픽셀/초 단위로 변경
+const ENEMY_MAX_SPEED = 200; // 최대 속도
+const SPEED_INCREASE_INTERVAL = 20000; // 20초마다 난이도 증가
+const SPEED_INCREASE_AMOUNT = 15; // 증가량
 const BGM_INITIAL_RATE = 1.0;
-const BGM_MAX_RATE = 1.5;
-const BGM_RATE_INCREASE_AMOUNT = 0.05;
-const BGM_FAST_THRESHOLD = 1.2;
-const POOP_INTERVAL = 10;
+const BGM_MAX_RATE = 1.4; // 최대 배속 감소
+const BGM_RATE_INCREASE_AMOUNT = 0.04; // 음악 속도 증가량 감소
+const BGM_FAST_THRESHOLD = 1.15; // 빠른 음악 전환 임계값 감소
+const POOP_INTERVAL = 8; // 똥 드롭 간격 감소 (더 자주)
 
 // 스킬 시스템 상수
 const SKILLS = {
@@ -45,51 +149,64 @@ const SKILLS = {
     BOMB: { id: 'bomb', name: '폭탄', cooldown: 10000, duration: 500, icon: '💣' }
 };
 
-// 파워업 아이템 상수
+// 파워업 아이템 상수 (확장됨)
 const POWERUPS = {
     SPEED: { id: 'speed', name: '스피드', duration: 5000, icon: '⚡', color: '#ffeb3b' },
     DOUBLE_POOP: { id: 'double_poop', name: '더블똥', duration: 8000, icon: '💩', color: '#8bc34a' },
     INVINCIBLE: { id: 'invincible', name: '무적', duration: 3000, icon: '⭐', color: '#ff9800' },
-    SCORE_BOOST: { id: 'score_boost', name: '점수부스트', duration: 10000, icon: '💎', color: '#9c27b0' }
+    SCORE_BOOST: { id: 'score_boost', name: '점수부스트', duration: 10000, icon: '💎', color: '#9c27b0' },
+    GHOST: { id: 'ghost', name: '유령모드', duration: 4000, icon: '👻', color: '#e1bee7' },
+    MAGNET: { id: 'magnet', name: '자석', duration: 6000, icon: '🧲', color: '#ff5722' },
+    TIME_SLOW: { id: 'time_slow', name: '시간지연', duration: 5000, icon: '⏰', color: '#607d8b' },
+    POOP_BOMB: { id: 'poop_bomb', name: '똥폭탄', duration: 1000, icon: '💥', color: '#f44336' }
 };
 
-// 스테이지 데이터
+// 스테이지 데이터 (속도 단위 수정)
 const STAGES = [
     {
         id: 1,
         name: '초보자 화장실',
-        enemyCount: 2,
-        enemySpeed: 0.8,
-        powerupChance: 0.3,
-        requiredScore: 0,
+        enemyCount: 1,
+        enemySpeed: 60, // 픽셀/초
+        powerupChance: 0.4,
+        requiredTime: 0, // 시작 스테이지
         bgColor: '#1a1a2e'
     },
     {
         id: 2,
         name: '공중 화장실',
-        enemyCount: 3,
-        enemySpeed: 1.0,
-        powerupChance: 0.25,
-        requiredScore: 30,
+        enemyCount: 2,
+        enemySpeed: 80, // 픽셀/초
+        powerupChance: 0.35,
+        requiredTime: 60, // 1분
         bgColor: '#2d1b69'
     },
     {
         id: 3,
         name: '고급 화장실',
-        enemyCount: 4,
-        enemySpeed: 1.2,
-        powerupChance: 0.2,
-        requiredScore: 60,
+        enemyCount: 3,
+        enemySpeed: 100, // 픽셀/초
+        powerupChance: 0.3,
+        requiredTime: 120, // 2분
         bgColor: '#1b4332'
     },
     {
         id: 4,
         name: '지옥의 화장실',
-        enemyCount: 5,
-        enemySpeed: 1.5,
-        powerupChance: 0.15,
-        requiredScore: 100,
+        enemyCount: 4,
+        enemySpeed: 120, // 픽셀/초
+        powerupChance: 0.25,
+        requiredTime: 200, // 3분 20초
         bgColor: '#7f1d1d'
+    },
+    {
+        id: 5,
+        name: '최종 화장실',
+        enemyCount: 5,
+        enemySpeed: 150, // 픽셀/초
+        powerupChance: 0.2,
+        requiredTime: 300, // 5분
+        bgColor: '#4c1d95'
     }
 ];
 const KEYBOARD_LAYOUT = [
@@ -105,15 +222,38 @@ function getDistance(p1, p2) { return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.
 
 class Game {
     constructor(canvasId) {
+        console.log('Game 생성자 시작');
+        
+        // 로딩 진행률 업데이트
+        if (window.updateLoadingProgress) {
+            window.updateLoadingProgress(40);
+        }
+        
         this.canvas = document.getElementById(canvasId);
+        if (!this.canvas) {
+            throw new Error('게임 캔버스를 찾을 수 없습니다');
+        }
+        
         this.ctx = this.canvas.getContext('2d');
-        this.bgmNormal = new Audio('./BgmNomal.wav');
-        this.bgmFast = new Audio('./BgmFast.wav');
-        this.sfxGameOver = new Audio('./gameover.wav');
+        if (!this.ctx) {
+            throw new Error('캔버스 컨텍스트를 가져올 수 없습니다');
+        }
+        
+        console.log('캔버스 초기화 완료');
+        
+        // 안전한 오디오 로딩
+        this.initAudio();
+        
+        // 로딩 진행률 업데이트
+        if (window.updateLoadingProgress) {
+            window.updateLoadingProgress(50);
+        }
         
         // 모바일 감지
         this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
                        ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        
+        console.log('모바일 감지:', this.isMobile);
         
         // 캔버스 크기 자동 조정
         this.resizeCanvas();
@@ -122,9 +262,10 @@ class Game {
             setTimeout(() => this.resizeCanvas(), 100);
         });
         
-        // BGM 미리 로드
-        if (this.bgmNormal) this.bgmNormal.load();
-        if (this.bgmFast) this.bgmFast.load();
+        // 로딩 진행률 업데이트
+        if (window.updateLoadingProgress) {
+            window.updateLoadingProgress(60);
+        }
         
         // 개선된 음소거 버튼
         this.createMuteButton();
@@ -134,10 +275,34 @@ class Game {
         this.lastFrameTime = 0;
         this.vibrationEnabled = this.isMobile && 'vibrate' in navigator;
 
+        console.log('기본 설정 완료, 이미지 로드 시작');
+        
         // 이미지 로드
         this.loadImages().then(() => {
+            console.log('이미지 로드 완료, 게임 초기화 시작');
             this.init();
             this.setupEventListeners();
+            console.log('게임 초기화 및 이벤트 리스너 설정 완료');
+            
+            // 로딩 완료
+            if (window.updateLoadingProgress) {
+                window.updateLoadingProgress(100);
+            }
+        }).catch(error => {
+            console.error('이미지 로드 실패:', error);
+            // 로딩 화면 숨기기
+            const loadingScreen = document.getElementById('loadingScreen');
+            if (loadingScreen) {
+                loadingScreen.style.display = 'none';
+            }
+            
+            // 오류 메시지 표시
+            const errorMessage = document.getElementById('errorMessage');
+            const errorText = document.getElementById('errorText');
+            if (errorMessage && errorText) {
+                errorText.textContent = '이미지 로드 중 오류가 발생했습니다: ' + error.message;
+                errorMessage.style.display = 'block';
+            }
         });
     }
 
@@ -191,8 +356,15 @@ class Game {
         document.body.appendChild(this.muteButton);
     }
 
-    // 이미지 로드 메서드 추가
+    // 이미지 로드 메서드 (개선된 오류 처리)
     loadImages() {
+        console.log('이미지 로드 시작');
+        
+        // 로딩 진행률 업데이트
+        if (window.updateLoadingProgress) {
+            window.updateLoadingProgress(65);
+        }
+        
         const imageFiles = {
             player: {
                 down: './poop_down.png',
@@ -221,6 +393,8 @@ class Game {
         };
 
         const promises = [];
+        let loadedCount = 0;
+        const totalImages = Object.keys(imageFiles.player).length + (3 * Object.keys(imageFiles.mob1).length);
 
         // 플레이어 이미지 로드
         Object.keys(imageFiles.player).forEach(key => {
@@ -229,9 +403,17 @@ class Game {
                 img.onload = () => {
                     this.playerImages = this.playerImages || {};
                     this.playerImages[key] = img;
+                    loadedCount++;
+                    console.log(`이미지 로드 진행률: ${loadedCount}/${totalImages}`);
                     resolve();
                 };
-                img.onerror = reject;
+                img.onerror = (error) => {
+                    console.error(`플레이어 이미지 로드 실패: ${imageFiles.player[key]}`, error);
+                    // 기본 색상 사각형으로 대체
+                    this.playerImages = this.playerImages || {};
+                    this.playerImages[key] = this.createFallbackImage('#4ecdc4');
+                    resolve(); // 실패해도 계속 진행
+                };
                 img.src = imageFiles.player[key];
             }));
         });
@@ -246,9 +428,18 @@ class Game {
                         this.enemyImages = this.enemyImages || {};
                         this.enemyImages[mobKey] = this.enemyImages[mobKey] || {};
                         this.enemyImages[mobKey][key] = img;
+                        loadedCount++;
+                        console.log(`이미지 로드 진행률: ${loadedCount}/${totalImages}`);
                         resolve();
                     };
-                    img.onerror = reject;
+                    img.onerror = (error) => {
+                        console.error(`적 이미지 로드 실패: ${imageFiles[mobKey][key]}`, error);
+                        // 기본 색상 사각형으로 대체
+                        this.enemyImages = this.enemyImages || {};
+                        this.enemyImages[mobKey] = this.enemyImages[mobKey] || {};
+                        this.enemyImages[mobKey][key] = this.createFallbackImage('#ff6b6b');
+                        resolve(); // 실패해도 계속 진행
+                    };
                     img.src = imageFiles[mobKey][key];
                 }));
             });
@@ -256,18 +447,120 @@ class Game {
 
         return Promise.all(promises).then(() => {
             console.log('모든 이미지 로드 완료:', this.playerImages, this.enemyImages);
+            // 로딩 진행률 업데이트
+            if (window.updateLoadingProgress) {
+                window.updateLoadingProgress(80);
+            }
+        }).catch(error => {
+            console.error('이미지 로드 중 오류 발생:', error);
+            // 모든 이미지를 기본 이미지로 대체
+            this.createFallbackImages();
+            if (window.updateLoadingProgress) {
+                window.updateLoadingProgress(80);
+            }
         });
+    }
+    
+    // 대체 이미지 생성 (이미지 로드 실패 시)
+    createFallbackImage(color) {
+        const canvas = document.createElement('canvas');
+        canvas.width = TILE_SIZE;
+        canvas.height = TILE_SIZE;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        return canvas;
+    }
+    
+    // 모든 대체 이미지 생성
+    createFallbackImages() {
+        console.log('대체 이미지 생성 중...');
+        this.playerImages = {
+            up: this.createFallbackImage('#4ecdc4'),
+            down: this.createFallbackImage('#4ecdc4'),
+            left: this.createFallbackImage('#4ecdc4'),
+            right: this.createFallbackImage('#4ecdc4')
+        };
+        
+        this.enemyImages = {};
+        for (let i = 1; i <= 3; i++) {
+            const mobKey = `mob${i}`;
+            this.enemyImages[mobKey] = {
+                up: this.createFallbackImage('#ff6b6b'),
+                down: this.createFallbackImage('#ff6b6b'),
+                left: this.createFallbackImage('#ff6b6b'),
+                right: this.createFallbackImage('#ff6b6b')
+            };
+        }
+    }
+    
+    // 안전한 오디오 초기화
+    initAudio() {
+        try {
+            this.bgmNormal = new Audio('./BgmNomal.wav');
+            this.bgmFast = new Audio('./BgmFast.wav');
+            this.sfxGameOver = new Audio('./gameover.wav');
+            
+            // 오디오 로드 이벤트 리스너
+            this.bgmNormal.addEventListener('error', (e) => {
+                console.warn('일반 BGM 로드 실패:', e);
+                this.bgmNormal = null;
+            });
+            
+            this.bgmFast.addEventListener('error', (e) => {
+                console.warn('빠른 BGM 로드 실패:', e);
+                this.bgmFast = null;
+            });
+            
+            this.sfxGameOver.addEventListener('error', (e) => {
+                console.warn('게임오버 효과음 로드 실패:', e);
+                this.sfxGameOver = null;
+            });
+            
+            // 오디오 미리 로드
+            if (this.bgmNormal) {
+                this.bgmNormal.load();
+                this.bgmNormal.loop = true;
+                this.bgmNormal.volume = 0.5;
+            }
+            if (this.bgmFast) {
+                this.bgmFast.load();
+                this.bgmFast.loop = true;
+                this.bgmFast.volume = 0.5;
+            }
+            if (this.sfxGameOver) {
+                this.sfxGameOver.load();
+                this.sfxGameOver.volume = 0.7;
+            }
+            
+        } catch (error) {
+            console.error('오디오 초기화 실패:', error);
+            this.bgmNormal = null;
+            this.bgmFast = null;
+            this.sfxGameOver = null;
+        }
     }
 
     init() {
         this.keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
-        this.player = new Player(TILE_SIZE + 5, TILE_SIZE + 5, 4, this.playerImages);
+        // 플레이어를 맵 중앙 근처 안전한 위치에 배치
+        const centerX = Math.floor(MAP_COLS / 2) * TILE_SIZE + 5;
+        const centerY = Math.floor(MAP_ROWS / 2) * TILE_SIZE + 5;
+        this.player = new Player(centerX, centerY, 120, this.playerImages); // 픽셀/초 단위
         this.poops = [];
         this.poopMap = Array(MAP_ROWS).fill(0).map(() => Array(MAP_COLS).fill(false));
         this.enemies = [];
         this.gameState = 'PRE_GAME_OVERLAY'; // 초기 상태 변경
         this.poopCooldown = POOP_INTERVAL;
         this.score = 0;
+        
+        // 적 스폰 시스템 초기화
+        this.enemySpawnTimer = 0;
+        this.nextEnemySpawnTime = 10000; // 10초 후 첫 번째 추가 적
+        this.maxEnemies = 5; // 최대 적 수
         this.startTime = Date.now();
         this.currentName = [];
         this.keyboard = { x: 40, y: 350, keySize: 40, selectedKey: null };
@@ -293,6 +586,9 @@ class Game {
             swipeStartTime: 0
         };
         
+        // 다시 시작 버튼 초기화
+        this.restartButton = null;
+        
         // 자동 모바일 감지
         this.controlMode = this.isMobile ? 'MOBILE' : null;
         
@@ -306,28 +602,44 @@ class Game {
         this.activePowerups = [];
         this.particles = [];
         
+        // 성능 최적화 변수들
+        this.lastUIUpdate = 0;
+        this.dirtyRegions = [];
+        this.offscreenCanvas = document.createElement('canvas');
+        this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+        this.offscreenCanvas.width = this.canvas.width;
+        this.offscreenCanvas.height = this.canvas.height;
+        this.mapNeedsRedraw = true;
+        
         // 스테이지 전환 관련 변수들
         this.stageTransitionText = null;
         this.stageTransitionTime = 0;
         this.skillUnlockedText = null;
         this.skillUnlockedTime = 0;
+        this.skillEffectText = null;
+        this.skillEffectColor = '#ffffff';
+        this.skillEffectTime = 0;
         
-        // 스킬 초기화 (안전하게)
+        // 스킬 초기화 (레벨업으로 해금)
         try {
             Object.values(SKILLS).forEach(skill => {
                 if (skill && skill.id) {
                     this.skills[skill.id] = {
                         ...skill,
                         lastUsed: 0,
-                        unlocked: skill.id === 'dash' // 대시는 기본 스킬
+                        unlocked: skill.id === 'dash' // 대시만 기본 해금
                     };
                 }
             });
+            console.log('스킬 초기화 완료:', this.skills);
         } catch (error) {
             console.error('Error initializing skills:', error);
             // 기본 스킬만 설정
             this.skills = {
-                dash: { id: 'dash', name: '대시', cooldown: 5000, duration: 1000, icon: '💨', lastUsed: 0, unlocked: true }
+                dash: { id: 'dash', name: '대시', cooldown: 5000, duration: 1000, icon: '💨', lastUsed: 0, unlocked: true },
+                shield: { id: 'shield', name: '보호막', cooldown: 8000, duration: 3000, icon: '🛡️', lastUsed: 0, unlocked: false },
+                freeze: { id: 'freeze', name: '빙결', cooldown: 12000, duration: 2000, icon: '❄️', lastUsed: 0, unlocked: false },
+                bomb: { id: 'bomb', name: '폭탄', cooldown: 10000, duration: 500, icon: '💣', lastUsed: 0, unlocked: false }
             };
         }
         this.createEnemies();
@@ -357,21 +669,7 @@ class Game {
     }
 
     setupEventListeners() {
-        // startGameOverlay 클릭/터치 이벤트 리스너 추가
-        if (this.startGameOverlay) {
-            this.startGameOverlay.addEventListener('click', () => {
-                console.log('Start overlay clicked');
-                this.handleStartOverlayClick();
-            });
-            this.startGameOverlay.addEventListener('touchstart', (e) => {
-                console.log('Start overlay touched');
-                e.preventDefault();
-                this.handleStartOverlayClick();
-            }, { passive: false });
-            this.startGameOverlay.addEventListener('touchend', (e) => {
-                e.preventDefault();
-            }, { passive: false });
-        }
+        // startGameOverlay는 더 이상 사용하지 않음 (캔버스에 직접 그리기)
         document.addEventListener('keydown', (e) => {
             if (this.gameState === 'LEADERBOARD' && e.key.toLowerCase() === 'r') {
                 this.init();
@@ -380,11 +678,19 @@ class Game {
                 else if (e.key === 'Backspace') this.currentName.pop();
                 else if (/^[a-zA-Z0-9]$/.test(e.key) && this.currentName.length < 3) this.currentName.push(e.key.toUpperCase());
             } else if (this.gameState === 'PLAYING') {
-                // 스킬 단축키 (PC/모바일 공통)
-                if (e.key === 'q' || e.key === 'Q') this.useSkill('dash');
-                else if (e.key === 'w' || e.key === 'W') this.useSkill('shield');
-                else if (e.key === 'e' || e.key === 'E') this.useSkill('freeze');
-                else if (e.key === 'r' || e.key === 'R') this.useSkill('bomb');
+                // 스킬 단축키 (한글/영문 키보드 모두 지원)
+                if (e.key === 'q' || e.key === 'Q' || e.key === 'ㅂ') {
+                    this.useSkill('dash');
+                }
+                else if (e.key === 'w' || e.key === 'W' || e.key === 'ㅈ') {
+                    this.useSkill('shield');
+                }
+                else if (e.key === 'e' || e.key === 'E' || e.key === 'ㄷ') {
+                    this.useSkill('freeze');
+                }
+                else if (e.key === 'r' || e.key === 'R' || e.key === 'ㄱ') {
+                    this.useSkill('bomb');
+                }
                 
                 // PC 모드 이동키
                 if (this.controlMode === 'PC' && e.key in this.keys) {
@@ -401,7 +707,19 @@ class Game {
         });
         this.canvas.addEventListener('click', (e) => {
             if (this.gameState === 'LEADERBOARD') {
-                this.init();
+                const rect = this.canvas.getBoundingClientRect();
+                const clickX = (e.clientX - rect.left) * this.scaleX;
+                const clickY = (e.clientY - rect.top) * this.scaleY;
+                
+                // 다시 시작 버튼 클릭 체크
+                if (this.restartButton && 
+                    clickX >= this.restartButton.x && 
+                    clickX <= this.restartButton.x + this.restartButton.width &&
+                    clickY >= this.restartButton.y && 
+                    clickY <= this.restartButton.y + this.restartButton.height) {
+                    this.init();
+                    return;
+                }
                 return;
             }
             if (this.gameState === 'PRE_GAME_OVERLAY') {
@@ -459,6 +777,12 @@ class Game {
             if (this.gameState === 'PRE_GAME_OVERLAY') {
                 console.log('Canvas touched in PRE_GAME_OVERLAY state');
                 this.handleStartOverlayClick();
+                return;
+            }
+            
+            // 리더보드 터치 처리 (모바일)
+            if (this.gameState === 'LEADERBOARD') {
+                this.init();
                 return;
             }
             
@@ -542,15 +866,30 @@ class Game {
             this.touch.lastDirection = null;
         }, { passive: false });
 
-        // 전체 화면 터치 방지 (게임 영역 외부)
+        // 전체 화면 터치 방지 (게임 영역 외부) 및 시작 화면 처리
         document.addEventListener('touchstart', (e) => {
-            if (e.target !== this.canvas) {
+            // 시작 화면에서는 모든 터치를 게임 시작으로 처리
+            if (this.gameState === 'PRE_GAME_OVERLAY') {
+                console.log('Document touchstart in PRE_GAME_OVERLAY');
+                e.preventDefault();
+                this.handleStartOverlayClick();
+                return;
+            }
+            
+            // 리더보드에서는 터치로 게임 재시작
+            if (this.gameState === 'LEADERBOARD') {
+                e.preventDefault();
+                this.init();
+                return;
+            }
+            
+            if (e.target !== this.canvas && !e.target.closest('#startGameOverlay')) {
                 e.preventDefault();
             }
         }, { passive: false });
 
         document.addEventListener('touchmove', (e) => {
-            if (e.target !== this.canvas) {
+            if (e.target !== this.canvas && !e.target.closest('#startGameOverlay')) {
                 e.preventDefault();
             }
         }, { passive: false });
@@ -630,6 +969,13 @@ class Game {
     }
 
     startGame() {
+        // 스테이지 1 맵으로 초기화
+        this.changeMap(1);
+        
+        // 게임 시작 시 잠시 무적 상태 (적응 시간)
+        this.player.isInvincible = true;
+        this.player.invincibleStartTime = Date.now();
+        
         this.gameState = 'PLAYING';
         this.lastFrameTime = performance.now();
         this.vibrate(30); // 게임 시작 진동
@@ -656,13 +1002,141 @@ class Game {
     }
 
     createEnemies() {
-        const spawnPoints=[{x:TILE_SIZE*10+5,y:TILE_SIZE+5},{x:TILE_SIZE+5,y:TILE_SIZE*14+5},{x:TILE_SIZE*10+5,y:TILE_SIZE*14+5}];
-        const mobTypes = ['mob1', 'mob2', 'mob3']; // 몹 종류 배열
-        for(let i=0;i<ENEMY_COUNT;i++){ 
-            const sp=spawnPoints[i%spawnPoints.length];
-            const mobType = mobTypes[i % mobTypes.length]; // 몹 종류 순환
-            this.enemies.push(new Enemy(sp.x, sp.y, ENEMY_INITIAL_SPEED, this.enemyImages, mobType));
+        // 시작할 때는 적 1명만 생성
+        this.spawnFirstEnemy();
+        
+        // 적 스폰 타이머 초기화
+        this.enemySpawnTimer = 0;
+        this.nextEnemySpawnTime = 10000; // 10초 후 첫 번째 추가 적 스폰
+        this.maxEnemies = 5; // 최대 적 수
+    }
+    
+    spawnFirstEnemy() {
+        if (!this.enemyImages) return;
+        
+        // 플레이어로부터 가장 먼 위치에 첫 번째 적 생성
+        const safeSpots = this.getSafeSpawnSpots();
+        if (safeSpots.length > 0) {
+            const farthestSpot = this.getFarthestSpotFromPlayer(safeSpots);
+            const mobTypes = ['mob1', 'mob2', 'mob3'];
+            const mobType = mobTypes[0];
+            
+            try {
+                this.enemies.push(new Enemy(farthestSpot.x, farthestSpot.y, ENEMY_INITIAL_SPEED, this.enemyImages, mobType));
+                console.log(`첫 번째 적 생성: (${Math.floor(farthestSpot.x/TILE_SIZE)}, ${Math.floor(farthestSpot.y/TILE_SIZE)})`);
+            } catch (error) {
+                console.error('Error creating first enemy:', error);
+            }
         }
+    }
+    
+    getSafeSpawnSpots() {
+        const safeSpots = [];
+        for (let row = 1; row < MAP_ROWS - 1; row++) {
+            for (let col = 1; col < MAP_COLS - 1; col++) {
+                if (MAP[row][col] === 0) {
+                    safeSpots.push({x: col * TILE_SIZE + 5, y: row * TILE_SIZE + 5, row, col});
+                }
+            }
+        }
+        return safeSpots;
+    }
+    
+    getFarthestSpotFromPlayer(spots) {
+        const playerRow = Math.floor(this.player.y / TILE_SIZE);
+        const playerCol = Math.floor(this.player.x / TILE_SIZE);
+        
+        return spots.reduce((farthest, spot) => {
+            const currentDistance = Math.abs(spot.row - playerRow) + Math.abs(spot.col - playerCol);
+            const farthestDistance = Math.abs(farthest.row - playerRow) + Math.abs(farthest.col - playerCol);
+            return currentDistance > farthestDistance ? spot : farthest;
+        });
+    }
+    
+    updateEnemySpawning(deltaTime) {
+        // 적 스폰 타이머 업데이트
+        this.enemySpawnTimer += deltaTime;
+        
+        // 최대 적 수에 도달했으면 스폰하지 않음
+        if (this.enemies.length >= this.maxEnemies) return;
+        
+        // 스폰 시간이 되었으면 새로운 적 생성
+        if (this.enemySpawnTimer >= this.nextEnemySpawnTime) {
+            this.spawnRandomEnemy();
+            this.enemySpawnTimer = 0;
+            
+            // 다음 스폰 시간 설정 (점점 빨라짐, 최소 5초)
+            this.nextEnemySpawnTime = Math.max(5000, this.nextEnemySpawnTime - 1000);
+            console.log(`다음 적 스폰까지: ${this.nextEnemySpawnTime/1000}초`);
+        }
+    }
+    
+    spawnRandomEnemy() {
+        if (!this.enemyImages) return;
+        
+        try {
+            // 플레이어와 기존 적들로부터 충분히 떨어진 랜덤 위치 찾기
+            const safeSpots = this.getSafeSpawnSpots();
+            const validSpots = safeSpots.filter(spot => {
+                // 플레이어로부터 최소 4타일 떨어진 곳
+                const playerRow = Math.floor(this.player.y / TILE_SIZE);
+                const playerCol = Math.floor(this.player.x / TILE_SIZE);
+                const distanceFromPlayer = Math.abs(spot.row - playerRow) + Math.abs(spot.col - playerCol);
+                
+                // 기존 적들로부터도 최소 2타일 떨어진 곳
+                const tooCloseToEnemy = this.enemies.some(enemy => {
+                    const enemyRow = Math.floor(enemy.y / TILE_SIZE);
+                    const enemyCol = Math.floor(enemy.x / TILE_SIZE);
+                    const distanceFromEnemy = Math.abs(spot.row - enemyRow) + Math.abs(spot.col - enemyCol);
+                    return distanceFromEnemy < 2;
+                });
+                
+                return distanceFromPlayer >= 4 && !tooCloseToEnemy;
+            });
+            
+            if (validSpots.length > 0) {
+                // 랜덤한 유효한 위치 선택
+                const randomSpot = validSpots[Math.floor(Math.random() * validSpots.length)];
+                const mobTypes = ['mob1', 'mob2', 'mob3'];
+                const mobType = mobTypes[this.enemies.length % mobTypes.length];
+                
+                this.enemies.push(new Enemy(randomSpot.x, randomSpot.y, ENEMY_INITIAL_SPEED, this.enemyImages, mobType));
+                
+                console.log(`새로운 적 스폰: ${mobType} at (${Math.floor(randomSpot.x/TILE_SIZE)}, ${Math.floor(randomSpot.y/TILE_SIZE)})`);
+                
+                // 스폰 효과 추가
+                this.showEnemySpawnEffect(randomSpot.x, randomSpot.y);
+            } else {
+                console.log('적 스폰할 안전한 위치를 찾을 수 없음');
+            }
+        } catch (error) {
+            console.error('Error spawning random enemy:', error);
+        }
+    }
+    
+    showEnemySpawnEffect(x, y) {
+        // 적 스폰 시각 효과 (파티클이나 텍스트)
+        this.particles.push({
+            x: x,
+            y: y,
+            text: '👹',
+            life: 1000,
+            startTime: Date.now(),
+            update: function(deltaTime) {
+                this.life -= deltaTime;
+                return this.life > 0;
+            },
+            draw: function(ctx) {
+                const alpha = this.life / 1000;
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.font = '20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = 'red';
+                ctx.fillText(this.text, this.x, this.y - (1000 - this.life) * 0.05);
+                ctx.restore();
+            }
+        });
     }
 
     increaseDifficulty() {
@@ -681,10 +1155,8 @@ class Game {
         if (this.bgmFast && this.bgmFast.playbackRate > BGM_MAX_RATE) this.bgmFast.playbackRate = BGM_MAX_RATE;
     }
 
-    update() {
-        const currentTime = performance.now();
-        const deltaTime = (currentTime - this.lastFrameTime) / 1000;
-        this.lastFrameTime = currentTime;
+    update(deltaTime) {
+        // deltaTime은 gameLoop에서 전달받음
 
         // 플레이어 업데이트
         this.player.update(this.keys, this.player.currentMoveDirection, deltaTime);
@@ -710,6 +1182,9 @@ class Game {
         
         // 적 업데이트
         this.enemies.forEach(e => e.update(this.poops, this.player, this.enemies, deltaTime));
+        
+        // 시간에 따른 적 스폰
+        this.updateEnemySpawning(deltaTime);
         
         // 파워업 업데이트
         this.powerups = this.powerups.filter(powerup => powerup.update(deltaTime));
@@ -760,21 +1235,32 @@ class Game {
             
             // 플레이어와 적 충돌
             if (checkCollision(this.player, enemy)) {
-                // 보호막이나 무적 상태 체크
+                // 보호막 상태 체크 (최우선)
                 if (this.player.hasShield) {
                     this.player.hasShield = false; // 보호막 소모
+                    this.player.shieldStartTime = 0; // 보호막 타이머 리셋
                     enemy.stunned = true;
                     enemy.stunnedUntil = Date.now() + 1000;
+                    this.createSkillEffect('shield_break'); // 보호막 파괴 효과
                     this.vibrate(100);
-                    return;
+                    return; // 다음 적으로 넘어감 (게임오버 안됨)
                 }
                 
+                // 무적 상태 체크
                 if (this.player.isInvincible) {
-                    return; // 무적 상태면 데미지 없음
+                    return; // 다음 적으로 넘어감 (게임오버 안됨)
                 }
                 
-                // 게임오버
-                this.gameState = 'ENTERING_NAME';
+                // 게임오버 - 모바일에서는 바로 리더보드로
+                if (this.isMobile) {
+                    // 모바일에서는 기본 이름으로 점수 저장 후 바로 리더보드
+                    this.saveScore('Player', this.score);
+                    this.gameState = 'LEADERBOARD';
+                } else {
+                    // PC에서는 이름 입력 화면
+                    this.gameState = 'ENTERING_NAME';
+                }
+                
                 if (this.bgmNormal && !this.bgmNormal.paused) this.bgmNormal.pause();
                 if (this.bgmFast && !this.bgmFast.paused) this.bgmFast.pause();
                 this.playSound(this.sfxGameOver);
@@ -827,21 +1313,51 @@ class Game {
         this.drawDpad();
     }
 
-    gameLoop() {
+    gameLoop(currentTime = performance.now()) {
+        // 프레임 레이트 제한 (60 FPS)
+        const deltaTime = (currentTime - this.lastFrameTime) / 1000;
+        this.lastFrameTime = currentTime;
+        
+        // 프레임 스킵 (너무 빠른 프레임은 건너뛰기)
+        if (deltaTime < 1/120) {
+            this.animationFrameId = requestAnimationFrame((time) => this.gameLoop(time));
+            return;
+        }
+        
         try {
-            if (this.gameState === 'PLAYING') {
-                this.score = Math.floor((Date.now() - this.startTime) / 1000);
-                this.update();
-                this.handleCollisions();
-                this.draw();
-            } else if (this.gameState === 'PRE_GAME_OVERLAY') {
-                // 오버레이가 표시되는 동안은 게임 로직 업데이트/그리기 안함
-            } else if (this.gameState === 'CONTROL_SELECTION') {
-                this.drawControlSelectionScreen();
-            } else if (this.gameState === 'ENTERING_NAME') {
-                this.drawNameEntryScreen();
-            } else if (this.gameState === 'LEADERBOARD') {
-                this.drawLeaderboard();
+            // 상태별 최적화된 렌더링
+            switch(this.gameState) {
+                case 'PLAYING':
+                    this.score = Math.floor((Date.now() - this.startTime) / 1000);
+                    this.update(deltaTime);
+                    this.handleCollisions();
+                    this.draw();
+                    break;
+                case 'PRE_GAME_OVERLAY':
+                    // 시작 화면은 30fps로 제한
+                    if (currentTime - this.lastUIUpdate > 33) {
+                        this.drawStartScreen();
+                        this.lastUIUpdate = currentTime;
+                    }
+                    break;
+                case 'CONTROL_SELECTION':
+                    if (currentTime - this.lastUIUpdate > 33) {
+                        this.drawControlSelectionScreen();
+                        this.lastUIUpdate = currentTime;
+                    }
+                    break;
+                case 'ENTERING_NAME':
+                    if (currentTime - this.lastUIUpdate > 33) {
+                        this.drawNameEntryScreen();
+                        this.lastUIUpdate = currentTime;
+                    }
+                    break;
+                case 'LEADERBOARD':
+                    if (currentTime - this.lastUIUpdate > 33) {
+                        this.drawLeaderboard();
+                        this.lastUIUpdate = currentTime;
+                    }
+                    break;
             }
         } catch (error) {
             console.error('Error in gameLoop:', error);
@@ -849,18 +1365,47 @@ class Game {
             this.gameState = 'ENTERING_NAME';
         }
         
-        this.animationFrameId = requestAnimationFrame(() => this.gameLoop());
+        this.animationFrameId = requestAnimationFrame((time) => this.gameLoop(time));
     }
     
     drawMap() {
-        for(let r=0; r<MAP_ROWS; r++) {
-            for(let c=0; c<MAP_COLS; c++) {
-                if(MAP[r][c]===1) {
-                    this.ctx.fillStyle='#34568B';
-                    this.ctx.fillRect(c*TILE_SIZE, r*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        // 맵이 변경되었을 때만 다시 그리기
+        if (this.mapNeedsRedraw) {
+            this.offscreenCtx.clearRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
+            
+            // 배경 그라디언트
+            const gradient = this.offscreenCtx.createLinearGradient(0, 0, 0, this.canvas.height);
+            gradient.addColorStop(0, '#1a1a2e');
+            gradient.addColorStop(1, '#16213e');
+            this.offscreenCtx.fillStyle = gradient;
+            this.offscreenCtx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            // 벽 그리기 (배치로 최적화)
+            this.offscreenCtx.fillStyle = '#34568B';
+            for(let r = 0; r < MAP_ROWS; r++) {
+                for(let c = 0; c < MAP_COLS; c++) {
+                    if(MAP[r][c] === 1) {
+                        this.offscreenCtx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    }
                 }
             }
+            
+            // 벽에 테두리 효과 추가
+            this.offscreenCtx.strokeStyle = '#4a90e2';
+            this.offscreenCtx.lineWidth = 1;
+            for(let r = 0; r < MAP_ROWS; r++) {
+                for(let c = 0; c < MAP_COLS; c++) {
+                    if(MAP[r][c] === 1) {
+                        this.offscreenCtx.strokeRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    }
+                }
+            }
+            
+            this.mapNeedsRedraw = false;
         }
+        
+        // 오프스크린 캔버스에서 메인 캔버스로 복사
+        this.ctx.drawImage(this.offscreenCanvas, 0, 0);
     }
 
     drawUI() {
@@ -890,10 +1435,8 @@ class Game {
         this.ctx.fillStyle = '#4ecdc4';
         this.ctx.fillRect(expBarX, 25, (expBarWidth * expPercent) / 100, 6);
         
-        // 스킬 UI (모바일에서만)
-        if (this.controlMode === 'MOBILE') {
-            this.drawSkillButtons();
-        }
+        // 스킬 UI (PC와 모바일 모두)
+        this.drawSkillButtons();
         
         // 활성 파워업 표시
         this.drawActivePowerups();
@@ -920,6 +1463,26 @@ class Game {
             this.ctx.restore();
         }
         
+        // 스킬 사용 효과 텍스트
+        if (this.skillEffectText && Date.now() - this.skillEffectTime < 1500) {
+            this.ctx.save();
+            const elapsed = Date.now() - this.skillEffectTime;
+            const alpha = Math.max(0, 1 - elapsed / 1500);
+            const scale = 1 + (elapsed / 1500) * 0.5; // 텍스트가 커지면서 사라짐
+            
+            this.ctx.globalAlpha = alpha;
+            this.ctx.fillStyle = this.skillEffectColor;
+            this.ctx.font = `bold ${Math.floor(24 * scale)}px Arial`;
+            this.ctx.textAlign = 'center';
+            this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+            this.ctx.lineWidth = 2;
+            
+            const textY = this.canvas.height / 2 - 50 - (elapsed / 1500) * 30; // 위로 올라가면서 사라짐
+            this.ctx.strokeText(this.skillEffectText, this.canvas.width / 2, textY);
+            this.ctx.fillText(this.skillEffectText, this.canvas.width / 2, textY);
+            this.ctx.restore();
+        }
+        
         // 초보자 안내 - 위치 조정
         if (this.score < 5) {
             this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
@@ -928,58 +1491,88 @@ class Game {
             if (this.controlMode === 'MOBILE') {
                 this.ctx.fillText('스와이프: 이동 | 스킬버튼: 특수능력', this.canvas.width / 2, 60);
             } else {
-                this.ctx.fillText('방향키: 이동 | Q,W,E,R: 스킬', this.canvas.width / 2, 60);
+                this.ctx.fillText('방향키: 이동 | Q(ㅂ),W(ㅈ),E(ㄷ),R(ㄱ): 스킬', this.canvas.width / 2, 60);
             }
         }
     }
     
     drawSkillButtons() {
         const skillIds = ['dash', 'shield', 'freeze', 'bomb'];
-        const buttonSize = 32; // 더 작게
-        const startX = this.canvas.width - 150;
-        const startY = this.canvas.height - 50;
+        const skillKeys = ['Q/ㅂ', 'W/ㅈ', 'E/ㄷ', 'R/ㄱ']; // PC 키보드 단축키 (한글/영문)
+        
+        // PC와 모바일에 따른 다른 레이아웃
+        let buttonSize, startX, startY, spacing;
+        
+        if (this.controlMode === 'MOBILE') {
+            buttonSize = 40;
+            startX = this.canvas.width - 200;
+            startY = this.canvas.height - 60;
+            spacing = 45;
+        } else {
+            // PC 버전: 상단 우측에 더 큰 스킬 UI
+            buttonSize = 36;
+            startX = this.canvas.width - 180;
+            startY = 50;
+            spacing = 42;
+        }
         
         skillIds.forEach((skillId, index) => {
             const skill = this.skills[skillId];
-            const x = startX + (index * 36);
+            const x = startX + (index * spacing);
             const y = startY;
             
             // 스킬이 해금되지 않았으면 회색으로
-            if (!skill.unlocked) {
+            if (!skill || !skill.unlocked) {
                 this.ctx.fillStyle = 'rgba(100, 100, 100, 0.3)';
             } else {
                 const now = Date.now();
                 const cooldownRemaining = Math.max(0, skill.cooldown - (now - skill.lastUsed));
                 
                 if (cooldownRemaining > 0) {
-                    this.ctx.fillStyle = 'rgba(200, 100, 100, 0.4)';
+                    this.ctx.fillStyle = 'rgba(200, 100, 100, 0.6)';
                 } else {
-                    this.ctx.fillStyle = 'rgba(74, 144, 226, 0.5)';
+                    this.ctx.fillStyle = 'rgba(74, 144, 226, 0.7)';
                 }
             }
             
-            // 버튼 배경 - 더 투명하게
+            // 버튼 배경
             this.ctx.fillRect(x, y, buttonSize, buttonSize);
-            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-            this.ctx.lineWidth = 1;
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            this.ctx.lineWidth = 2;
             this.ctx.strokeRect(x, y, buttonSize, buttonSize);
             
-            // 스킬 아이콘 - 더 작게
+            // 스킬 아이콘
             this.ctx.fillStyle = 'white';
-            this.ctx.font = '16px Arial';
+            this.ctx.font = 'bold 18px Arial';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
-            this.ctx.fillText(skill.icon, x + buttonSize/2, y + buttonSize/2);
+            if (skill) {
+                this.ctx.fillText(skill.icon, x + buttonSize/2, y + buttonSize/2);
+            }
             
-            // 쿨다운 표시 - 더 작게
-            if (skill.unlocked) {
+            // PC 버전에서는 키보드 단축키 표시
+            if (this.controlMode === 'PC') {
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                this.ctx.font = 'bold 8px Arial';
+                this.ctx.fillText(skillKeys[index], x + buttonSize/2, y - 8);
+            }
+            
+            // 쿨다운 표시
+            if (skill && skill.unlocked) {
                 const now = Date.now();
                 const cooldownRemaining = Math.max(0, skill.cooldown - (now - skill.lastUsed));
                 if (cooldownRemaining > 0) {
-                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                    this.ctx.font = '10px Arial';
-                    this.ctx.fillText(Math.ceil(cooldownRemaining / 1000), x + buttonSize/2, y + buttonSize + 10);
+                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                    this.ctx.font = 'bold 12px Arial';
+                    this.ctx.fillText(Math.ceil(cooldownRemaining / 1000), x + buttonSize/2, y + buttonSize + 15);
                 }
+            }
+            
+            // 스킬 이름 (PC 버전에서만)
+            if (this.controlMode === 'PC' && skill && skill.unlocked) {
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                this.ctx.font = '10px Arial';
+                this.ctx.fillText(skill.name, x + buttonSize/2, y - 5);
             }
         });
     }
@@ -1055,6 +1648,47 @@ class Game {
         }
     }
 
+    drawStartScreen() {
+        // 배경 그라디언트
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        gradient.addColorStop(0, 'rgba(26,26,46,0.95)');
+        gradient.addColorStop(0.5, 'rgba(22,33,62,0.95)');
+        gradient.addColorStop(1, 'rgba(15,52,96,0.95)');
+        
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // 제목
+        this.ctx.fillStyle = 'white';
+        this.ctx.textAlign = 'center';
+        this.ctx.font = 'bold 48px Arial';
+        this.ctx.fillText('🎮 똥맨', this.canvas.width / 2, this.canvas.height / 2 - 80);
+        
+        // 부제목
+        this.ctx.font = '24px Arial';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        this.ctx.fillText('Poop-Man Game', this.canvas.width / 2, this.canvas.height / 2 - 40);
+        
+        // 시작 안내
+        this.ctx.font = 'bold 20px Arial';
+        this.ctx.fillStyle = '#4ecdc4';
+        this.ctx.fillText('화면을 터치하여 시작하세요', this.canvas.width / 2, this.canvas.height / 2 + 20);
+        
+        // 애니메이션 효과 (깜빡이는 손가락)
+        const time = Date.now();
+        const alpha = (Math.sin(time * 0.005) + 1) / 2;
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        this.ctx.font = '40px Arial';
+        this.ctx.fillText('👆', this.canvas.width / 2, this.canvas.height / 2 + 80);
+        
+        // 모바일 감지 표시
+        if (this.isMobile) {
+            this.ctx.font = '16px Arial';
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            this.ctx.fillText('모바일 모드로 시작됩니다', this.canvas.width / 2, this.canvas.height - 40);
+        }
+    }
+
     drawLeaderboard(){
         const scores=this.getScores();
         this.ctx.fillStyle='rgba(0,0,0,0.7)';
@@ -1067,8 +1701,30 @@ class Game {
         scores.forEach((s,i)=>{
             this.ctx.fillText(`${i+1}. ${s.name} - ${s.score}`,this.canvas.width/2,160+i*40);
         });
-        this.ctx.font='20px sans-serif';
-        this.ctx.fillText('Click to Restart',this.canvas.width/2,this.canvas.height-50);
+        
+        // 다시 시작 버튼
+        const buttonWidth = 200;
+        const buttonHeight = 50;
+        const buttonX = (this.canvas.width - buttonWidth) / 2;
+        const buttonY = this.canvas.height - 100;
+        
+        this.ctx.fillStyle = '#4CAF50';
+        this.ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+        this.ctx.strokeStyle = '#45a049';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
+        
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = 'bold 20px sans-serif';
+        this.ctx.fillText('다시 시작', this.canvas.width/2, buttonY + 32);
+        
+        // 버튼 영역 저장 (클릭 감지용)
+        this.restartButton = {
+            x: buttonX,
+            y: buttonY,
+            width: buttonWidth,
+            height: buttonHeight
+        };
     }
 
     drawControlSelectionScreen() {
@@ -1270,18 +1926,76 @@ class Game {
         }
     }
     
+    createSkillEffect(skillId) {
+        const playerCenterX = this.player.x + this.player.width / 2;
+        const playerCenterY = this.player.y + this.player.height / 2;
+        
+        switch(skillId) {
+            case 'dash':
+                // 파란색 대시 효과
+                this.createPowerupParticles(playerCenterX, playerCenterY, '#4a90e2');
+                this.showSkillText('💨 DASH!', '#4a90e2');
+                break;
+            case 'shield':
+                // 청록색 보호막 효과
+                this.createPowerupParticles(playerCenterX, playerCenterY, '#00bcd4');
+                this.showSkillText('🛡️ SHIELD!', '#00bcd4');
+                break;
+            case 'freeze':
+                // 얼음 효과 - 모든 적 주변에 파티클
+                this.enemies.forEach(enemy => {
+                    this.createPowerupParticles(enemy.x + 16, enemy.y + 16, '#87ceeb');
+                });
+                this.showSkillText('❄️ FREEZE!', '#87ceeb');
+                break;
+            case 'bomb':
+                // 폭발 효과는 이미 createBombExplosion에서 처리
+                this.showSkillText('💣 BOMB!', '#ff4444');
+                break;
+            case 'shield_break':
+                // 보호막 파괴 효과
+                this.createPowerupParticles(playerCenterX, playerCenterY, '#ffaa00');
+                this.showSkillText('🛡️ 보호막 파괴!', '#ffaa00');
+                break;
+        }
+    }
+    
+    showSkillText(text, color) {
+        // 스킬 사용 텍스트 표시
+        this.skillEffectText = text;
+        this.skillEffectColor = color;
+        this.skillEffectTime = Date.now();
+    }
+    
     checkStageProgression() {
         try {
             const nextStage = STAGES.find(stage => stage.id === this.currentStage + 1);
-            if (nextStage && this.score >= nextStage.requiredScore) {
-                console.log(`Stage progression: ${this.currentStage} -> ${this.currentStage + 1}`);
-                this.currentStage++;
-                this.showStageTransition();
-                this.updateStageSettings();
+            if (nextStage && this.score >= nextStage.requiredTime) {
+                // 10초 전 경고 메시지
+                const timeUntilNext = nextStage.requiredTime - this.score;
+                if (timeUntilNext <= 10 && timeUntilNext > 0 && !this.stageWarningShown) {
+                    this.showStageWarning(timeUntilNext);
+                    this.stageWarningShown = true;
+                }
+                
+                // 스테이지 변경
+                if (this.score >= nextStage.requiredTime) {
+                    console.log(`Stage progression: ${this.currentStage} -> ${this.currentStage + 1}`);
+                    this.currentStage++;
+                    this.stageWarningShown = false; // 다음 스테이지를 위해 리셋
+                    this.showStageTransition();
+                    this.updateStageSettings();
+                }
             }
         } catch (error) {
             console.error('Error in checkStageProgression:', error);
         }
+    }
+    
+    showStageWarning(timeLeft) {
+        this.stageTransitionText = `⚠️ ${Math.ceil(timeLeft)}초 후 다음 스테이지!`;
+        this.stageTransitionTime = Date.now();
+        console.log(`Stage warning: ${Math.ceil(timeLeft)} seconds until next stage`);
     }
     
     updateStageSettings() {
@@ -1291,6 +2005,9 @@ class Game {
                 console.error('Invalid stage:', this.currentStage);
                 return;
             }
+            
+            // 맵 변경 (스테이지에 맞는 맵으로 변경)
+            this.changeMap(this.currentStage);
             
             // 적 수 조정 (최대 10개로 제한하여 무한 루프 방지)
             let attempts = 0;
@@ -1329,9 +2046,91 @@ class Game {
         }
     }
     
+    changeMap(stageNumber) {
+        try {
+            // 새로운 맵이 있으면 변경, 없으면 마지막 맵 사용
+            const newMap = MAPS[stageNumber] || MAPS[5]; // 최대 5개 맵, 그 이후는 5번 맵 재사용
+            MAP = newMap;
+            
+            console.log(`맵 변경: 스테이지 ${stageNumber}`);
+            
+            // 기존 똥들 완전히 제거
+            this.poops = [];
+            this.poopMap = Array(MAP_ROWS).fill(0).map(() => Array(MAP_COLS).fill(false));
+            
+            // 파워업들도 제거 (새로운 맵에서 새로 시작)
+            this.powerups = [];
+            
+            // 플레이어와 적들의 위치를 새로운 맵에 맞게 조정
+            this.repositionCharacters();
+            
+            // 맵 변경 시 플레이어에게 잠시 무적 상태 부여 (적응 시간)
+            this.player.isInvincible = true;
+            this.player.invincibleStartTime = Date.now();
+            
+            // 맵 변경 효과음이나 시각 효과 추가 가능
+            this.showMapChangeEffect();
+            
+        } catch (error) {
+            console.error('Error changing map:', error);
+        }
+    }
+    
+    repositionCharacters() {
+        try {
+            // 플레이어를 맵 중앙 근처 안전한 위치로 이동
+            const centerRow = Math.floor(MAP_ROWS / 2);
+            const centerCol = Math.floor(MAP_COLS / 2);
+            
+            // 중앙 근처에서 빈 공간 찾기
+            let playerSpot = null;
+            for (let radius = 0; radius < 3; radius++) {
+                for (let dr = -radius; dr <= radius; dr++) {
+                    for (let dc = -radius; dc <= radius; dc++) {
+                        const row = centerRow + dr;
+                        const col = centerCol + dc;
+                        if (row >= 1 && row < MAP_ROWS - 1 && col >= 1 && col < MAP_COLS - 1 && MAP[row][col] === 0) {
+                            playerSpot = {x: col * TILE_SIZE + 5, y: row * TILE_SIZE + 5, row, col};
+                            break;
+                        }
+                    }
+                    if (playerSpot) break;
+                }
+                if (playerSpot) break;
+            }
+            
+            if (playerSpot) {
+                this.player.x = playerSpot.x;
+                this.player.y = playerSpot.y;
+                console.log(`플레이어 재배치: (${Math.floor(playerSpot.x/TILE_SIZE)}, ${Math.floor(playerSpot.y/TILE_SIZE)})`);
+            }
+            
+            // 기존 적들 제거 (새로운 스폰 시스템으로 다시 생성됨)
+            this.enemies = [];
+            
+            // 적 스폰 시스템 리셋
+            this.enemySpawnTimer = 0;
+            this.nextEnemySpawnTime = 10000; // 10초 후 첫 번째 적
+            
+            // 첫 번째 적만 즉시 생성
+            setTimeout(() => {
+                this.spawnFirstEnemy();
+            }, 1000); // 1초 후에 첫 번째 적 생성
+            
+        } catch (error) {
+            console.error('Error repositioning characters:', error);
+        }
+    }
+    
+    showMapChangeEffect() {
+        // 맵 변경 시각 효과
+        this.stageTransitionText = `🗺️ 새로운 맵!`;
+        this.stageTransitionTime = Date.now();
+    }
+    
     showStageTransition() {
         // 스테이지 전환 애니메이션 (간단한 텍스트)
-        this.stageTransitionText = `스테이지 ${this.currentStage}`;
+        this.stageTransitionText = `🎯 스테이지 ${this.currentStage} - 새로운 맵!`;
         this.stageTransitionTime = Date.now();
     }
     
@@ -1341,7 +2140,7 @@ class Game {
         
         try {
             // 새로운 스킬 해금 (안전하게)
-            const skillIds = Object.keys(SKILLS);
+            const skillIds = Object.values(SKILLS).map(skill => skill.id); // 실제 스킬 ID 사용
             const unlockedSkills = skillIds.filter(id => this.skills[id] && this.skills[id].unlocked);
             
             if (unlockedSkills.length < skillIds.length) {
@@ -1349,6 +2148,7 @@ class Game {
                 if (this.skills[nextSkillId]) {
                     this.skills[nextSkillId].unlocked = true;
                     this.showSkillUnlocked(nextSkillId);
+                    console.log(`스킬 해금: ${nextSkillId} (레벨 ${this.level})`);
                 }
             }
         } catch (error) {
@@ -1359,16 +2159,19 @@ class Game {
     }
     
     showSkillUnlocked(skillId) {
-        const skill = SKILLS[skillId];
-        this.skillUnlockedText = `새 스킬: ${skill.name} ${skill.icon}`;
-        this.skillUnlockedTime = Date.now();
+        const skill = this.skills[skillId]; // this.skills에서 가져오기
+        if (skill) {
+            this.skillUnlockedText = `새 스킬: ${skill.name} ${skill.icon}`;
+            this.skillUnlockedTime = Date.now();
+            console.log(`스킬 해금 알림: ${skill.name}`);
+        }
     }
     
     useSkill(skillId) {
         const skill = this.skills[skillId];
         const now = Date.now();
         
-        if (!skill.unlocked || now - skill.lastUsed < skill.cooldown) {
+        if (!skill || !skill.unlocked || now - skill.lastUsed < skill.cooldown) {
             return false;
         }
         
@@ -1377,18 +2180,22 @@ class Game {
         switch(skillId) {
             case 'dash':
                 this.player.activateSkill('dash');
+                this.createSkillEffect('dash');
                 break;
             case 'shield':
                 this.player.activateSkill('shield');
+                this.createSkillEffect('shield');
                 break;
             case 'freeze':
                 this.enemies.forEach(enemy => {
                     enemy.frozen = true;
                     enemy.frozenUntil = now + SKILLS.FREEZE.duration;
                 });
+                this.createSkillEffect('freeze');
                 break;
             case 'bomb':
                 this.createBombExplosion();
+                this.createSkillEffect('bomb');
                 break;
         }
         
@@ -1397,18 +2204,87 @@ class Game {
     }
     
     createBombExplosion() {
-        // 플레이어 주변의 적들에게 데미지
-        const bombRadius = 80;
-        this.enemies.forEach(enemy => {
+        // 플레이어 주변의 적들을 일시적으로 제거
+        const bombRadius = 100;
+        const destroyedEnemies = [];
+        
+        // 폭발 범위 내의 적들 찾기
+        this.enemies.forEach((enemy, index) => {
             const distance = getDistance(this.player, enemy);
             if (distance < bombRadius) {
-                enemy.stunned = true;
-                enemy.stunnedUntil = Date.now() + 2000;
+                // 적 정보 저장 (리스폰용)
+                destroyedEnemies.push({
+                    x: enemy.x,
+                    y: enemy.y,
+                    speed: enemy.speed,
+                    mobType: enemy.mobType,
+                    respawnTime: Date.now() + (3000 + Math.random() * 2000) // 3-5초 후 리스폰
+                });
+                
+                // 적 제거 파티클 효과
+                this.createPowerupParticles(enemy.x + 16, enemy.y + 16, '#ff6666');
             }
+        });
+        
+        // 폭발 범위 내의 적들 제거
+        this.enemies = this.enemies.filter(enemy => {
+            const distance = getDistance(this.player, enemy);
+            return distance >= bombRadius;
+        });
+        
+        // 리스폰 예약 (this 컨텍스트 보존)
+        destroyedEnemies.forEach(enemyData => {
+            const gameInstance = this; // this 컨텍스트 보존
+            setTimeout(() => {
+                try {
+                    // 안전한 위치에서 리스폰
+                    const spawnPos = gameInstance.findSafeSpawnPosition();
+                    if (spawnPos && gameInstance.enemies) {
+                        const newEnemy = new Enemy(spawnPos.x, spawnPos.y, enemyData.speed, gameInstance.enemyImages, enemyData.mobType);
+                        gameInstance.enemies.push(newEnemy);
+                        gameInstance.showEnemySpawnEffect(spawnPos.x, spawnPos.y);
+                    }
+                } catch (error) {
+                    console.error('리스폰 오류:', error);
+                }
+            }, enemyData.respawnTime - Date.now());
         });
         
         // 폭발 파티클
         this.createPowerupParticles(this.player.x + this.player.width/2, this.player.y + this.player.height/2, '#ff4444');
+        
+        console.log(`폭탄으로 ${destroyedEnemies.length}개의 적 제거, 3-5초 후 리스폰 예정`);
+    }
+
+    findSafeSpawnPosition() {
+        // 플레이어로부터 충분히 멀고 벽이 아닌 위치 찾기
+        const minDistance = 150;
+        const maxAttempts = 50;
+        
+        for (let i = 0; i < maxAttempts; i++) {
+            const x = Math.random() * (this.canvas.width - 64) + 32;
+            const y = Math.random() * (this.canvas.height - 64) + 32;
+            
+            // 벽 체크
+            const tileX = Math.floor(x / TILE_SIZE);
+            const tileY = Math.floor(y / TILE_SIZE);
+            
+            if (tileX >= 0 && tileX < MAP_COLS && tileY >= 0 && tileY < MAP_ROWS && 
+                MAP[tileY][tileX] === 0) {
+                
+                // 플레이어와의 거리 체크
+                const distance = Math.sqrt((x - this.player.x) ** 2 + (y - this.player.y) ** 2);
+                if (distance >= minDistance) {
+                    return { x, y };
+                }
+            }
+        }
+        
+        // 안전한 위치를 못 찾으면 맵 모서리에서 스폰
+        return {
+            x: Math.random() < 0.5 ? 32 : this.canvas.width - 64,
+            y: Math.random() < 0.5 ? 32 : this.canvas.height - 64
+        };
     }
 
     getScores(){ return JSON.parse(localStorage.getItem('ddongman_scores'))||[]; }
@@ -1466,16 +2342,16 @@ class Player extends Character {
         }
 
         if (currentMoveDirection) {
-            if (currentMoveDirection === 'up') nY -= currentSpeed * deltaTime * 60;
-            else if (currentMoveDirection === 'down') nY += currentSpeed * deltaTime * 60;
-            else if (currentMoveDirection === 'left') nX -= currentSpeed * deltaTime * 60;
-            else if (currentMoveDirection === 'right') nX += currentSpeed * deltaTime * 60;
+            if (currentMoveDirection === 'up') nY -= currentSpeed * deltaTime;
+            else if (currentMoveDirection === 'down') nY += currentSpeed * deltaTime;
+            else if (currentMoveDirection === 'left') nX -= currentSpeed * deltaTime;
+            else if (currentMoveDirection === 'right') nX += currentSpeed * deltaTime;
             moved = true;
         } else {
-            if(keys.ArrowUp) { nY-=currentSpeed * deltaTime * 60; this.facingDirection = 'up'; moved = true; }
-            if(keys.ArrowDown) { nY+=currentSpeed * deltaTime * 60; this.facingDirection = 'down'; moved = true; }
-            if(keys.ArrowLeft) { nX-=currentSpeed * deltaTime * 60; this.facingDirection = 'left'; moved = true; }
-            if(keys.ArrowRight) { nX+=currentSpeed * deltaTime * 60; this.facingDirection = 'right'; moved = true; }
+            if(keys.ArrowUp) { nY -= currentSpeed * deltaTime; this.facingDirection = 'up'; moved = true; }
+            if(keys.ArrowDown) { nY += currentSpeed * deltaTime; this.facingDirection = 'down'; moved = true; }
+            if(keys.ArrowLeft) { nX -= currentSpeed * deltaTime; this.facingDirection = 'left'; moved = true; }
+            if(keys.ArrowRight) { nX += currentSpeed * deltaTime; this.facingDirection = 'right'; moved = true; }
         }
 
         // 트레일 위치 저장 (대시 중일 때)
@@ -1548,14 +2424,34 @@ class Player extends Character {
             });
         }
         
-        // 보호막 효과
+        // 보호막 효과 - 더 눈에 띄게
         if (this.hasShield) {
             ctx.save();
-            ctx.strokeStyle = '#4ecdc4';
-            ctx.lineWidth = 3;
-            ctx.setLineDash([5, 5]);
-            ctx.lineDashOffset = Date.now() * 0.01;
-            ctx.strokeRect(this.x - 5, this.y - 5, this.width + 10, this.height + 10);
+            
+            // 회전하는 보호막 링
+            const centerX = this.x + this.width / 2;
+            const centerY = this.y + this.height / 2;
+            const radius = 25;
+            const rotation = Date.now() * 0.005;
+            
+            ctx.strokeStyle = '#00bcd4';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([8, 4]);
+            ctx.lineDashOffset = Date.now() * 0.02;
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // 추가 글로우 효과
+            ctx.shadowColor = '#00bcd4';
+            ctx.shadowBlur = 10;
+            ctx.strokeStyle = 'rgba(0, 188, 212, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius + 3, 0, Math.PI * 2);
+            ctx.stroke();
+            
             ctx.restore();
         }
         
@@ -1654,6 +2550,48 @@ class Enemy extends Character {
         this.stunned = false;
         this.stunnedUntil = 0;
         this.originalSpeed = speed;
+        
+        // 적 타입별 특성 설정
+        this.setupEnemyType();
+    }
+    
+    setupEnemyType() {
+        switch(this.mobType) {
+            case 'mob1': // 기본 플런저 - 균형잡힌 타입
+                this.maxHealth = 1;
+                this.currentHealth = 1;
+                this.specialAbility = 'none';
+                this.color = '#ff6b6b';
+                break;
+            case 'mob2': // 빠른 플런저 - 속도가 빠르지만 약함
+                this.maxHealth = 1;
+                this.currentHealth = 1;
+                this.speed *= 1.3;
+                this.specialAbility = 'speed_boost';
+                this.color = '#4ecdc4';
+                break;
+            case 'mob3': // 강한 플런저 - 느리지만 강함
+                this.maxHealth = 2;
+                this.currentHealth = 2;
+                this.speed *= 0.8;
+                this.specialAbility = 'tank';
+                this.color = '#ffe66d';
+                break;
+            case 'mob4': // 텔레포트 플런저 (새로운 타입)
+                this.maxHealth = 1;
+                this.currentHealth = 1;
+                this.specialAbility = 'teleport';
+                this.teleportCooldown = 0;
+                this.color = '#a8e6cf';
+                break;
+            case 'mob5': // 분열 플런저 (새로운 타입)
+                this.maxHealth = 1;
+                this.currentHealth = 1;
+                this.specialAbility = 'split';
+                this.hasSplit = false;
+                this.color = '#ff8b94';
+                break;
+        }
     }
     update(poops,player,allEnemies, deltaTime){
         const now = Date.now();
@@ -1671,8 +2609,20 @@ class Enemy extends Character {
             this.stunned = false;
         }
         
-        if(this.state==='EATING'){if(--this.stateTimer<=0)this.state='CHASING';return;}
+        if(this.state==='EATING'){
+            this.stateTimer -= deltaTime;
+            if(this.stateTimer <= 0) {
+                this.state='CHASING';
+            }
+            return;
+        }
         if(this.state==='CHASING'){
+            // 목표 똥이 사라졌는지 확인
+            if(this.targetPoop && !poops.includes(this.targetPoop)) {
+                this.targetPoop = null;
+                this.path = [];
+            }
+            
             if(!this.path||this.path.length===0){
                 let target=null;
                 if(poops.length>0){
@@ -1708,17 +2658,23 @@ class Enemy extends Character {
                     else if (dy < 0) this.facingDirection = 'up';
                 }
                 
-                if(Math.abs(dx)>0)this.x+=Math.sign(dx)*this.speed * deltaTime * 60;
+                if(Math.abs(dx)>0)this.x+=Math.sign(dx)*this.speed * deltaTime;
                 if(this.isWall(this.x,this.y)||this.isWall(this.x+this.width,this.y)||this.isWall(this.x,this.y+this.height)||this.isWall(this.x+this.width,this.y+this.height)){
                     this.x=oX;
                     this.path=[];
                 }
-                if(Math.abs(dy)>0)this.y+=Math.sign(dy)*this.speed * deltaTime * 60;
+                if(Math.abs(dy)>0)this.y+=Math.sign(dy)*this.speed * deltaTime;
                 if(this.isWall(this.x,this.y)||this.isWall(this.x+this.width,this.y)||this.isWall(this.x,this.y+this.height)||this.isWall(this.x+this.width,this.y+this.height)){
                     this.y=oY;
                     this.path=[];
                 }
-                if(this.path&&Math.abs(tX-this.x)<this.speed&&Math.abs(tY-this.y)<this.speed)this.path.shift();
+                // 목표 지점에 충분히 가까우면 다음 경로로 이동
+                if(this.path && this.path.length > 0) {
+                    const distanceToTarget = Math.sqrt((tX-this.x)**2 + (tY-this.y)**2);
+                    if(distanceToTarget < TILE_SIZE * 0.3) { // 타일 크기의 30% 이내면 도달로 간주
+                        this.path.shift();
+                    }
+                }
             }
         }
     }
@@ -1777,9 +2733,11 @@ class Enemy extends Character {
         }}}
         return null;
     }
-    onPoopEaten(){this.path=[];this.targetPoop=null;
-    this.state='EATING';
-    this.stateTimer=5;
+    onPoopEaten(){
+        this.path=[];
+        this.targetPoop=null;
+        this.state='EATING';
+        this.stateTimer=0.5; // 0.5초 동안 먹기 상태
     }
 }
 
@@ -1801,11 +2759,8 @@ Game.prototype.initBGM = function() {
 Game.prototype.handleStartOverlayClick = function() {
     console.log('handleStartOverlayClick called, gameState:', this.gameState);
     if (this.gameState === 'PRE_GAME_OVERLAY') {
-        console.log('Processing start overlay click');
-        // 오버레이 숨기기
-        if (this.startGameOverlay) {
-            this.startGameOverlay.style.display = 'none';
-        }
+        console.log('Processing start screen click/touch');
+        
         // BGM 초기화 및 재생
         if (this.bgmNormal) {
             this.bgmNormal.playbackRate = BGM_INITIAL_RATE;
@@ -1923,4 +2878,77 @@ class Particle {
         ctx.fill();
         ctx.restore();
     }
+    
+    // 메모리 정리 메서드
+    cleanup() {
+        try {
+            // 애니메이션 프레임 정리
+            if (this.animationFrameId) {
+                cancelAnimationFrame(this.animationFrameId);
+                this.animationFrameId = null;
+            }
+            
+            // 타이머 정리
+            if (this.difficultyTimer) {
+                clearInterval(this.difficultyTimer);
+                this.difficultyTimer = null;
+            }
+            
+            // 오디오 정리
+            if (this.bgmNormal) {
+                this.bgmNormal.pause();
+                this.bgmNormal.currentTime = 0;
+            }
+            if (this.bgmFast) {
+                this.bgmFast.pause();
+                this.bgmFast.currentTime = 0;
+            }
+            
+            // 이벤트 리스너 정리
+            window.removeEventListener('resize', this.resizeCanvas);
+            window.removeEventListener('orientationchange', this.resizeCanvas);
+            
+            // 배열 정리
+            this.poops = [];
+            this.enemies = [];
+            this.powerups = [];
+            this.activePowerups = [];
+            this.particles = [];
+            this.activeSkills = [];
+            
+            console.log('게임 리소스 정리 완료');
+        } catch (error) {
+            console.error('정리 중 오류 발생:', error);
+        }
+    }
+    
+    // 안전한 게임 재시작
+    safeRestart() {
+        try {
+            this.cleanup();
+            setTimeout(() => {
+                this.init();
+            }, 100); // 약간의 지연으로 안정성 확보
+        } catch (error) {
+            console.error('게임 재시작 중 오류:', error);
+            // 페이지 새로고침으로 완전 초기화
+            window.location.reload();
+        }
+    }
 }
+
+// 전역 오류 처리
+window.addEventListener('error', (event) => {
+    console.error('전역 오류 발생:', event.error);
+    // 게임이 실행 중이면 안전하게 정리
+    if (window.gameInstance) {
+        window.gameInstance.cleanup();
+    }
+});
+
+// 페이지 언로드 시 정리
+window.addEventListener('beforeunload', () => {
+    if (window.gameInstance) {
+        window.gameInstance.cleanup();
+    }
+});
