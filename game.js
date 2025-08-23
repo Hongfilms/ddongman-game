@@ -272,12 +272,12 @@ class Game {
         this.currentName = [];
         this.keyboard = { x: 40, y: 350, keySize: 40, selectedKey: null };
         
-        // 개선된 모바일 컨트롤
+        // 개선된 모바일 컨트롤 - 더 작고 투명하게
         this.dpad = { 
-            x: 30, 
-            y: this.canvas.height - 140, 
-            size: 120, 
-            buttonSize: 50, 
+            x: 25, 
+            y: this.canvas.height - 110, 
+            size: 90, 
+            buttonSize: 35, 
             activeDirection: null,
             centerX: 0,
             centerY: 0
@@ -357,11 +357,20 @@ class Game {
     }
 
     setupEventListeners() {
-        // startGameOverlay 클릭 이벤트 리스너 추가
+        // startGameOverlay 클릭/터치 이벤트 리스너 추가
         if (this.startGameOverlay) {
             this.startGameOverlay.addEventListener('click', () => {
+                console.log('Start overlay clicked');
                 this.handleStartOverlayClick();
             });
+            this.startGameOverlay.addEventListener('touchstart', (e) => {
+                console.log('Start overlay touched');
+                e.preventDefault();
+                this.handleStartOverlayClick();
+            }, { passive: false });
+            this.startGameOverlay.addEventListener('touchend', (e) => {
+                e.preventDefault();
+            }, { passive: false });
         }
         document.addEventListener('keydown', (e) => {
             if (this.gameState === 'LEADERBOARD' && e.key.toLowerCase() === 'r') {
@@ -396,18 +405,7 @@ class Game {
                 return;
             }
             if (this.gameState === 'PRE_GAME_OVERLAY') {
-                this.startGameOverlay.style.display = 'none';
-                if (this.bgmNormal) {
-                    this.bgmNormal.play().catch(e => console.log("BGM play error:", e));
-                }
-                
-                // 모바일이면 바로 모바일 모드로, 아니면 선택 화면
-                if (this.isMobile) {
-                    this.controlMode = 'MOBILE';
-                    this.startGame();
-                } else {
-                    this.gameState = 'CONTROL_SELECTION';
-                }
+                this.handleStartOverlayClick();
                 return;
             }
             if (this.gameState === 'CONTROL_SELECTION') {
@@ -456,6 +454,13 @@ class Game {
             const touch = e.touches[0];
             const x = (touch.clientX - rect.left) * this.scaleX;
             const y = (touch.clientY - rect.top) * this.scaleY;
+            
+            // 시작 화면 터치 처리
+            if (this.gameState === 'PRE_GAME_OVERLAY') {
+                console.log('Canvas touched in PRE_GAME_OVERLAY state');
+                this.handleStartOverlayClick();
+                return;
+            }
             
             if (this.gameState === 'PLAYING') {
                 // 스킬 버튼 터치 체크 (모바일)
@@ -1133,20 +1138,20 @@ class Game {
         const centerX = dpad.x + dpad.size / 2;
         const centerY = dpad.y + dpad.size / 2;
         
-        // D-pad 외곽 원 (글로우 효과)
+        // D-pad 외곽 원 (글로우 효과) - 더 투명하게
         this.ctx.save();
-        this.ctx.shadowColor = 'rgba(74, 144, 226, 0.5)';
-        this.ctx.shadowBlur = 15;
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.shadowColor = 'rgba(74, 144, 226, 0.3)';
+        this.ctx.shadowBlur = 10;
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
         this.ctx.beginPath();
-        this.ctx.arc(centerX, centerY, dpad.size / 2 + 5, 0, Math.PI * 2);
+        this.ctx.arc(centerX, centerY, dpad.size / 2 + 3, 0, Math.PI * 2);
         this.ctx.fill();
         this.ctx.restore();
         
-        // D-pad 배경
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        this.ctx.lineWidth = 2;
+        // D-pad 배경 - 더 투명하게
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        this.ctx.lineWidth = 1;
         this.ctx.beginPath();
         this.ctx.arc(centerX, centerY, dpad.size / 2, 0, Math.PI * 2);
         this.ctx.fill();
@@ -1164,32 +1169,32 @@ class Game {
             const isActive = this.dpad.activeDirection === dir.name || 
                            this.player.currentMoveDirection === dir.name;
             
-            // 버튼 배경
+            // 버튼 배경 - 더 투명하게
             this.ctx.fillStyle = isActive ? 
-                'rgba(74, 144, 226, 0.8)' : 
-                'rgba(255, 255, 255, 0.2)';
+                'rgba(74, 144, 226, 0.5)' : 
+                'rgba(255, 255, 255, 0.1)';
             this.ctx.strokeStyle = isActive ? 
-                'rgba(74, 144, 226, 1)' : 
-                'rgba(255, 255, 255, 0.4)';
-            this.ctx.lineWidth = 2;
+                'rgba(74, 144, 226, 0.7)' : 
+                'rgba(255, 255, 255, 0.2)';
+            this.ctx.lineWidth = 1;
             
             this.ctx.beginPath();
             this.ctx.arc(dir.x, dir.y, dpad.buttonSize / 2, 0, Math.PI * 2);
             this.ctx.fill();
             this.ctx.stroke();
             
-            // 방향 심볼
-            this.ctx.fillStyle = isActive ? 'white' : 'rgba(255, 255, 255, 0.8)';
-            this.ctx.font = 'bold 20px Arial';
+            // 방향 심볼 - 더 작게
+            this.ctx.fillStyle = isActive ? 'white' : 'rgba(255, 255, 255, 0.6)';
+            this.ctx.font = 'bold 16px Arial';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
             this.ctx.fillText(dir.symbol, dir.x, dir.y);
         });
         
-        // 중앙 점
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        // 중앙 점 - 더 작게
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
         this.ctx.beginPath();
-        this.ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+        this.ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
         this.ctx.fill();
     }
 
@@ -1794,7 +1799,9 @@ Game.prototype.initBGM = function() {
 
 // Game 클래스에 handleStartOverlayClick 메서드 추가
 Game.prototype.handleStartOverlayClick = function() {
+    console.log('handleStartOverlayClick called, gameState:', this.gameState);
     if (this.gameState === 'PRE_GAME_OVERLAY') {
+        console.log('Processing start overlay click');
         // 오버레이 숨기기
         if (this.startGameOverlay) {
             this.startGameOverlay.style.display = 'none';
@@ -1808,15 +1815,22 @@ Game.prototype.handleStartOverlayClick = function() {
         if (this.bgmFast) {
             this.bgmFast.playbackRate = BGM_INITIAL_RATE;
             this.bgmFast.currentTime = 0;
-            this.bgmFast.pause(); // 시작 시에는 fast BGM은 멈춰있음
+            this.bgmFast.pause();
         }
         if (this.bgmNormal) {
             this.bgmNormal.play().catch(e => console.log("BGM play error:", e));
         }
-        // 게임 상태 변경
-        this.gameState = 'CONTROL_SELECTION';
-        // 게임 루프 재시작 (필요한 경우)
-        // this.gameLoop(); // 일반적으로 gameLoop는 계속 실행 중이므로 별도 호출은 필요 없을 수 있음
+        
+        // 모바일이면 바로 모바일 모드로, 아니면 선택 화면
+        console.log('isMobile:', this.isMobile);
+        if (this.isMobile) {
+            console.log('Starting mobile mode');
+            this.controlMode = 'MOBILE';
+            this.startGame();
+        } else {
+            console.log('Going to control selection');
+            this.gameState = 'CONTROL_SELECTION';
+        }
     }
 };
 
